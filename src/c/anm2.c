@@ -615,7 +615,8 @@ generate_script_content(struct ptk_anm2 const *const doc, char **const content, 
       }
 
       // Insert a "(None)" option as the first item for selectors
-      if (!ov_sprintf_append_char(&body, err, "%1$hs", ",%1$hs=0", pgettext(".ptk.anm2 Unselected item name for selector", "(None)"))) {
+      if (!ov_sprintf_append_char(
+              &body, err, "%1$hs", ",%1$hs=0", pgettext(".ptk.anm2 Unselected item name for selector", "(None)"))) {
         OV_ERROR_ADD_TRACE(err);
         goto cleanup;
       }
