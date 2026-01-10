@@ -12,55 +12,468 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
 
+msgctxt "layer"
+msgid "%1$hs (Selected in AviUtl)"
+msgstr "%1$hs (AviUtl 中选中)"
+
+msgctxt "layer"
+msgid "%1$hs (Selected in anm2 Editor)"
+msgstr "%1$hs (anm2 Editor 中选中)"
+
+msgctxt "anm2editor"
+msgid "%1$hs Selector"
+msgstr "%1$hs 选择器"
+
+msgctxt "anm2editor"
+msgid "(Add new...)"
+msgstr "(新增……)"
+
+msgctxt "anm2editor"
+msgid "(Unnamed Item)"
+msgstr "(未命名项目)"
+
+msgctxt "anm2editor"
+msgid "(Unnamed Selector)"
+msgstr "(未命名选择器)"
+
+msgctxt "script_picker"
+msgid "(empty)"
+msgstr "(未设置)"
+
+msgctxt "anm2editor"
+msgid ""
+"1. Select a PSD File object in AviUtl ExEdit2\n"
+"2. Add effects like \"Blinker@PSDToolKit\" and configure them\n"
+"3. Press this button\n"
+"\n"
+"This feature imports animation settings from the selected PSD File object."
+msgstr ""
+"1. 在 AviUtl ExEdit2 中选择一个 PSD文件 物件\n"
+"2. 添加“眨眼@PSDToolKit”等效果并进行设置\n"
+"3. 按下此按钮\n"
+"\n"
+"此功能用于从选中的 PSD 文件物件中导入动画设置。"
+
+msgid "A different PSD file is assigned to the destination. Do you want to continue?"
+msgstr "传递目标已被分配了不同的 PSD 文件。是否继续？"
+
+msgctxt "anm2editor"
+msgid "Add Selector"
+msgstr "添加选择器"
+
+msgctxt "layer"
+msgid "Add all child layers of to anm2 Editor"
+msgstr "将所有子图层添加到 anm2 编辑器"
+
+msgctxt "layer"
+msgid "Add entire slider to anm2 Editor"
+msgstr "将整个滑块添加到 anm2 编辑器"
+
+msgctxt "layer"
+msgid "Add to anm2 Editor"
+msgstr "添加到 anm2 编辑器"
+
+msgctxt "anm2editor"
+msgid "All Files"
+msgstr "所有文件"
+
+msgid "An error occurred while loading project data."
+msgstr "工程数据读取时发生错误。"
+
+msgid "An error occurred while saving project data."
+msgstr "工程数据保存时发生错误。"
+
+msgctxt "anm2editor"
+msgid "An error occurred."
+msgstr "发生错误。"
+
+msgid "Assign \"%1$hs\" to \"%2$hs\""
+msgstr "将 \"%1$hs\" 分配到 \"%2$hs\""
+
+msgctxt "config"
 msgid "Audio File Drop Extension"
 msgstr "音频文件拖放扩展"
 
+msgctxt "anm2editor"
+msgid "AviUtl ExEdit2 Animation Script"
+msgstr "AviUtl ExEdit2 动画脚本"
+
+msgctxt "anm2editor"
+msgid "AviUtl1 Animation Script"
+msgstr "AviUtl1 动画脚本"
+
+msgctxt "config"
 msgid "Cancel"
 msgstr "取消"
 
+msgctxt "script_picker"
+msgid "Cancel"
+msgstr "取消"
+
+msgctxt "gui"
+msgid "Capture"
+msgstr "接受"
+
+msgctxt "anm2editor"
+msgid "Conversion completed."
+msgstr "转换完成。"
+
+msgctxt "anm2editor"
+msgid "Convert Old Animation Script(*.anm) to New(*.anm2)"
+msgstr "将旧版动画脚本(*.anm) 转换为新版(*.anm2)"
+
+msgctxt "layer"
+msgid "Copy all child layers of to clipboard"
+msgstr "将所有子图层复制到剪贴板"
+
+msgctxt "layer"
+msgid "Copy entire slider to clipboard"
+msgstr "将整个滑块复制到剪贴板"
+
+msgctxt "layer"
+msgid "Copy to clipboard"
+msgstr "复制到剪贴板"
+
+#, c-format
+msgid ""
+"Current PSD file object:\n"
+"%1$s\n"
+"\n"
+"PSD file to be assigned:\n"
+"%2$s"
+msgstr ""
+"当前 PSD 文件物件:\n"
+"%1$s\n"
+"\n"
+"正在尝试分配的 PSD 文件:\n"
+"%2$s"
+
+msgctxt "config"
 msgid "Debug"
 msgstr "调试"
 
+msgctxt "anm2editor"
+msgid "Delete"
+msgstr "删除"
+
+msgctxt "script_picker"
+msgid "Deselect All"
+msgstr "取消全选"
+
+msgctxt "anm2editor"
+msgid "Do you want to continue adding?"
+msgstr "是否要继续添加？"
+
+msgctxt "anm2editor"
+msgid "Do you want to continue opening this file?"
+msgstr "是否继续打开该文件？"
+
+msgctxt "anm2editor"
+msgid "Do you want to save changes before closing?"
+msgstr "是否在关闭前保存修改？"
+
+msgid "Effect \"%1$hs\" not found."
+msgstr "找不到 \"%1$hs\" 效果"
+
+msgctxt "config"
 msgid "Enable &debug mode"
 msgstr "启用调试模式(&D)"
 
-msgid "Failed to save settings."
-msgstr "保存设置失败。"
+msgctxt ".ptk.anm2"
+msgid "Exclusive Support"
+msgstr "互斥锁支持"
 
+msgctxt "anm2editor"
+msgid "Exclusive Support Default"
+msgstr "互斥锁支持默认值"
+
+msgid "Failed to add to PSDToolKit anm2 Editor."
+msgstr "添加到 PSDToolKit anm2 编辑器失败。"
+
+msgid "Failed to assign value to PSDToolKit anm2 Editor."
+msgstr "为 PSDToolKit anm2 编辑器赋值失败。"
+
+msgid "Failed to assign value to effect."
+msgstr "为效果赋值失败。"
+
+msgid "Failed to copy to clipboard."
+msgstr "复制到剪贴板失败。"
+
+msgid "Failed to save settings."
+msgstr "设置保存失败。"
+
+msgid "Failed to update editing image state."
+msgstr "编辑图像状态更新失败。"
+
+msgctxt "layerview"
+msgid "Favorites"
+msgstr "收藏夹"
+
+#, c-format
+msgid "GCMZDrops requires AviUtl ExEdit2 %1$s or later."
+msgstr ""
+
+msgid "GCMZDrops version is too old. PSDToolKit requires GCMZDrops %1$hs or later."
+msgstr "GCMZDrops 版本过旧。PSDToolKit 需要 GCMZDrops %1$hs 或更高版本。"
+
+msgctxt "script_picker"
+msgid "Import"
+msgstr "导入"
+
+msgctxt "script_picker"
+msgid "Import Scripts"
+msgstr "导入脚本"
+
+msgctxt "anm2editor"
+msgid "Import Scripts from Selected Object in AviUtl"
+msgstr "从 AviUtl 中的选中物件导入脚本"
+
+msgctxt "anm2editor"
+msgid "Information"
+msgstr "信息"
+
+msgctxt "anm2editor"
+msgid "Label"
+msgstr "标签"
+
+msgid "Layer name or value contains forbidden character sequence \"]==]\"."
+msgstr "图层名或值包含非法字符序列 \"]==]\" 。"
+
+msgctxt "layerview"
+msgid "Layers"
+msgstr "图层"
+
+msgctxt "anm2editor"
+msgid "New"
+msgstr "新建"
+
+msgid "No assignable parameters found in selected selector in anm2 Editor."
+msgstr "anm2 编辑器的选中选择器中找不到可分配参数。"
+
+msgid "No importable scripts found in the selected object."
+msgstr "选中物件中找不到可导入脚本。"
+
+msgid "No object is selected. Please select a PSD object in the timeline."
+msgstr "未选择物件。请在时间轴中选择一个 PSD 物件。"
+
+msgctxt "anm2editor"
+msgid ""
+"Note: This conversion uses simple string replacement and may not work correctly in all cases.\n"
+"Also, this converted script is different from *.ptk.anm2 and cannot be edited in this editor."
+msgstr ""
+"注意：此转换为简单的字符串替换，因此无法保证在所有情况下都正常工作。\n"
+"此外，转换后的脚本与 *.ptk.anm2 不同，因此无法在该编辑器中编辑。"
+
+msgid "Note: Uncheck the safeguard checkbox in the PSD object settings to disable this dialog."
+msgstr "备注：取消勾选 PSD 物件设置中的安全保护复选框，可禁用该对话框。"
+
+msgctxt "config"
 msgid "OK"
 msgstr "确定"
+
+msgctxt "anm2editor"
+msgid "Open"
+msgstr "打开"
+
+msgid "Operation failed."
+msgstr "操作失败。"
+
+msgctxt ".ptk.anm2 label"
+msgid "PSD"
+msgstr "PSD"
+
+msgctxt "anm2editor"
+msgid "PSD File Path"
+msgstr "PSD文件路径"
+
+msgctxt ".ptk.anm2"
+msgid "PSD Layer Selector for %1$hs"
+msgstr "%1$hs 用PSD图层选择器"
+
+msgid "PSD file effect not found in the selected object."
+msgstr "选中物件中找不到PSD文件效果。"
+
+msgid "PSD file path is required to add to PSDToolKit anm2 Editor."
+msgstr "添加到 PSDToolKit anm2 编辑器需要 PSD 文件路径。"
 
 msgid "PSDToolKit"
 msgstr "PSDToolKit"
 
+msgctxt "config"
 msgid "PSDToolKit Settings"
 msgstr "PSDToolKit 设置"
 
 msgid "PSDToolKit Settings..."
 msgstr "PSDToolKit 设置..."
 
+msgctxt "anm2editor"
+msgid "PSDToolKit anm2"
+msgstr "PSDToolKit anm2"
+
+msgid "PSDToolKit anm2 Editor"
+msgstr "PSDToolKit anm2 编辑器"
+
+msgid "PSDToolKit anm2 Editor is not open."
+msgstr "PSDToolKit anm2 编辑器未打开。"
+
+msgctxt "anm2editor"
+msgid "Property"
+msgstr "属性"
+
+msgctxt "anm2editor"
+msgid "Redo"
+msgstr "重做"
+
+msgctxt "anm2editor"
+msgid "Rename"
+msgstr "重命名"
+
+msgctxt "anm2editor"
+msgid "Reverse Items"
+msgstr "反转项目排序"
+
+msgctxt "anm2editor"
+msgid "Save"
+msgstr "保存"
+
+msgctxt "anm2editor"
+msgid "Save As"
+msgstr "另存为"
+
+msgctxt "anm2editor"
+msgid "Save converted *.anm2"
+msgstr "保存已转换的 *.anm2 文件"
+
+msgctxt "anm2editor"
+msgid "Select *.anm to convert"
+msgstr "选择要转换的 *.anm 文件"
+
+msgctxt "script_picker"
+msgid "Select All"
+msgstr "全选"
+
+msgctxt "script_picker"
+msgid "Select scripts to import:"
+msgstr "选择要导入的脚本:"
+
+msgctxt ".ptk.anm2 default name for unnamed selector"
+msgid "Selector"
+msgstr "选择器"
+
+msgctxt "gui"
+msgid "Send"
+msgstr "发送"
+
+msgctxt "layerview"
+msgid "Simple View"
+msgstr "简易视图"
+
+msgctxt "anm2editor"
+msgid ""
+"The anm2 Editor is editing a script for a different PSD file.\n"
+"\n"
+"Editor:\n"
+"%1$hs\n"
+"\n"
+"This layer:\n"
+"%2$hs\n"
+"\n"
+"Adding may not work as expected."
+msgstr ""
+"anm2 编辑器正在编辑其他 PSD文件用脚本。\n"
+"\n"
+"编辑器:\n"
+"%1$hs\n"
+"\n"
+"图层:\n"
+"%2$hs\n"
+"\n"
+"如果直接添加，可能无法按预期工作。"
+
+msgid "The file does not appear to be a legacy PSDToolKit anm script."
+msgstr "该文件不是有效的 PSDToolKit anm 脚本。"
+
+msgid "The file does not appear to be a valid PSDToolKit anm2 script."
+msgstr "该文件不是有效的 PSDToolKit anm2 脚本。"
+
+msgid "The selected object does not have a %1$hs."
+msgstr "选中物件没有 %1$hs。"
+
+msgctxt "script_picker"
+msgid ""
+"These scripts are assigned to a different PSD file.\n"
+"\n"
+"Current Editor: %1$hs\n"
+"Importing From: %2$hs"
+msgstr ""
+"这些脚本已被分配至不同的PSD文件。\n"
+"\n"
+"当前编辑器:%1$hs\n"
+"导入源:%2$hs"
+
+msgctxt "anm2editor"
+msgid "This file appears to have been manually edited. If you continue editing in this editor, the manual changes may be lost."
+msgstr "该文件似乎已被手动修改。如果使用编辑器编辑，修改将会丢失。"
+
+msgctxt "config"
 msgid "Trigger Conditions"
 msgstr "触发条件"
 
+msgctxt "anm2editor"
+msgid "Undo"
+msgstr "撤销"
+
+msgctxt ".ptk.anm2 default selector name"
+msgid "Unnamed Selector"
+msgstr "未命名选择器"
+
+msgctxt "anm2editor"
+msgid "Unnamed Selector"
+msgstr "未命名选择器"
+
+msgctxt "anm2editor"
+msgid "Unsaved"
+msgstr "未保存"
+
+msgctxt "script_picker"
+msgid "Update PSD file path"
+msgstr "更新PSD文件路径"
+
+msgctxt "anm2editor"
+msgid "Value"
+msgstr "值"
+
+msgctxt "anm2editor"
+msgid "Welcome to Script Importer!"
+msgstr "欢迎使用脚本导入工具！"
+
+msgctxt "config"
 msgid "When dropping *.object containing only &audio and text on the same frame"
-msgstr "拖放仅包含音频和文本的 *.object 到同一帧时(&A)"
+msgstr "将仅包含音频和文本的 *.object 拖放到同一帧时(&A)"
 
+msgctxt "config"
 msgid "When dropping *.object containing only a&udio and text on the same frame"
-msgstr "拖放仅包含音频和文本的 *.object 到同一帧时(&U)"
+msgstr "将仅包含音频和文本的 *.object 拖放到同一帧时(&U)"
 
+msgctxt "config"
 msgid "When dropping *.wav and *.txt files with the same name &together"
 msgstr "同时拖放同名的 *.wav 和 *.txt 文件时(&T)"
 
+msgctxt "config"
 msgid "When dropping *.wav and *.txt files with the same name t&ogether"
 msgstr "同时拖放同名的 *.wav 和 *.txt 文件时(&O)"
 
+msgctxt "config"
 msgid "When dropping *.wav file while holding &Shift key"
 msgstr "按住 &Shift 键拖放 *.wav 文件时"
 
+msgctxt "config"
 msgid "When dropping files manually:"
 msgstr "手动拖放文件时:"
 
+msgctxt "config"
 msgid "When dropping via external API:"
 msgstr "通过外部 API 拖放时:"
 
@@ -69,6 +482,78 @@ msgstr ""
 "Microsoft YaHei UI\n"
 "Microsoft YaHei\n"
 "SimSun"
+
+msgid "edit section is not available."
+msgstr "编辑区不可用。"
+
+msgid "failed to add PSD file."
+msgstr "PSD文件添加失败。"
+
+msgid "failed to draw PSD image."
+msgstr "PSD图像渲染失败。"
+
+msgid "failed to get %1$hs on %2$hs."
+msgstr "%2$hs 上的 %1$hs 获取失败。"
+
+msgid "failed to get alias data from the selected object."
+msgstr "无法从选中物件中获取预存数据。"
+
+msgid "failed to get debug mode."
+msgstr "调试模式设置获取失败。"
+
+msgid "failed to get drop configuration."
+msgstr "拖放配置获取失败。"
+
+msgid "failed to get preferred languages."
+msgstr "首选语言设置获取失败。"
+
+msgid "failed to get required functions from GCMZDrops.aux2 plug-in."
+msgstr ""
+
+#, fuzzy
+msgid "failed to initialize plugin."
+msgstr "插件初始化失败。"
+
+msgid "failed to load GCMZDrops.aux2 plug-in."
+msgstr ""
+
+msgid "failed to load config, continuing with default settings."
+msgstr "配置读取失败，将使用默认设置继续。"
+
+msgid "failed to load language resources, continuing without them."
+msgstr "语言资源加载失败。强制继续。"
+
+msgid "failed to read text file."
+msgstr "文本文件读取失败。"
+
+#, fuzzy
+msgid "failed to register plugin."
+msgstr "设置保存失败。"
+
+msgid "failed to set %1$hs on %2$hs."
+msgstr "%2$hs 上的 %1$hs 重写失败。"
+
+msgid "failed to set PSD properties."
+msgstr "PSD属性设置失败。"
+
+msgid "failed to show configuration dialog."
+msgstr "配置对话框显示失败。"
+
+#, c-format
+msgid "file size %1$lld bytes exceeds limit."
+msgstr "文件大小 %1$lld 字节超出限制。"
+
+msgid "no assignable parameters found in selected object in AviUtl."
+msgstr "AviUtl 的选中物件中找不到可分配参数。"
+
+msgid "no importable scripts found in the selected object."
+msgstr "选中物件中找不到可导入脚本。"
+
+msgid "no object is selected in AviUtl ExEdit2."
+msgstr "AviUtl ExEdit2 中未选中任何物件。"
+
+msgid "no object is selected in AviUtl."
+msgstr "AviUtl 中未选中任何物件。"
 
 #. trans: This dagger helps UTF-8 detection. You don't need to translate this.
 msgid "†"
