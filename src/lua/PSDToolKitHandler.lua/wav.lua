@@ -214,7 +214,7 @@ function M.extract_wav_and_txt(files, state, config)
 	local from_external = state.from_external_api
 
 	-- Condition 1: manual_shift_wav - single *.wav with Shift key (manual only)
-	if not from_external and config.manual_shift_wav and state.shift then
+	if not from_external and config.manual_shift_wav ~= 0 and state.shift then
 		local wav_path, txt_content = M.get_audio_text_from_single_wav(files)
 		if wav_path then
 			dbg("PSDToolKit: Triggered by manual_shift_wav")
@@ -223,7 +223,7 @@ function M.extract_wav_and_txt(files, state, config)
 	end
 
 	-- Condition 2: manual_wav_txt_pair - *.wav and *.txt pair (manual only)
-	if not from_external and config.manual_wav_txt_pair then
+	if not from_external and config.manual_wav_txt_pair ~= 0 then
 		local wav_path, txt_content = M.get_audio_text_from_wav_txt_pair(files)
 		if wav_path then
 			dbg("PSDToolKit: Triggered by manual_wav_txt_pair")
@@ -232,7 +232,7 @@ function M.extract_wav_and_txt(files, state, config)
 	end
 
 	-- Condition 3: manual_object_audio_text - *.object with audio+text (manual only)
-	if not from_external and config.manual_object_audio_text then
+	if not from_external and config.manual_object_audio_text ~= 0 then
 		local wav_path, txt_content = M.get_audio_text_from_single_object(files)
 		if wav_path then
 			dbg("PSDToolKit: Triggered by manual_object_audio_text")
@@ -241,7 +241,7 @@ function M.extract_wav_and_txt(files, state, config)
 	end
 
 	-- Condition 4: external_wav_txt_pair - *.wav and *.txt pair (external API only)
-	if from_external and config.external_wav_txt_pair then
+	if from_external and config.external_wav_txt_pair ~= 0 then
 		local wav_path, txt_content = M.get_audio_text_from_wav_txt_pair(files)
 		if wav_path then
 			dbg("PSDToolKit: Triggered by external_wav_txt_pair")
@@ -250,7 +250,7 @@ function M.extract_wav_and_txt(files, state, config)
 	end
 
 	-- Condition 5: external_object_audio_text - *.object with audio+text (external API only)
-	if from_external and config.external_object_audio_text then
+	if from_external and config.external_object_audio_text ~= 0 then
 		local wav_path, txt_content = M.get_audio_text_from_single_object(files)
 		if wav_path then
 			dbg("PSDToolKit: Triggered by external_object_audio_text")
