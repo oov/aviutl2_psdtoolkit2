@@ -108,10 +108,6 @@ static int const icon_resources[ICON_COUNT] = {
     [ICON_CONVERT] = IDB_TOOLBAR_CONVERT,
 };
 
-// =============================================================================
-// GDI+ helper for loading toolbar icons
-// =============================================================================
-
 // Load a single PNG resource and add to both normal and disabled ImageLists.
 // GDI+ must already be initialized.
 // Returns true on success.
@@ -372,6 +368,10 @@ static bool detaillist_is_editable(LPARAM lparam) {
   return lparam != DETAILLIST_LPARAM_PLACEHOLDER && lparam != DETAILLIST_LPARAM_NOT_EDITABLE;
 }
 
+// Check if lParam represents an item ID in multi-selection mode
+// Item IDs are positive 32-bit values, special constants are negative
+static bool detaillist_is_multisel_item(LPARAM lparam) { return lparam > 0 && lparam <= UINT32_MAX; }
+
 static size_t detaillist_get_param_index(LPARAM lparam) { return (size_t)lparam; }
 
 // Build file filter string for file dialogs
@@ -438,7 +438,156 @@ struct ptk_anm2editor {
 
   // Transaction state for batch TreeView updates
   int transaction_depth; // Nesting depth of group_begin/group_end
+
+  // Multi-selection state for items
+  // Stores item IDs that are currently selected
+  uint32_t *selected_item_ids; // ovarray of item IDs
+  uint32_t anchor_item_id;     // Anchor item ID for Shift+click range selection (0 = none)
 };
+
+// Clear all multi-selections
+static void multisel_clear(struct ptk_anm2editor *editor) {
+  if (editor->selected_item_ids) {
+    OV_ARRAY_SET_LENGTH(editor->selected_item_ids, 0);
+  }
+}
+
+// Check if an item ID is in the multi-selection
+static bool multisel_contains(struct ptk_anm2editor const *editor, uint32_t item_id) {
+  size_t const len = OV_ARRAY_LENGTH(editor->selected_item_ids);
+  for (size_t i = 0; i < len; i++) {
+    if (editor->selected_item_ids[i] == item_id) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Add an item ID to the multi-selection (if not already present)
+static bool multisel_add(struct ptk_anm2editor *editor, uint32_t item_id, struct ov_error *const err) {
+  if (multisel_contains(editor, item_id)) {
+    return true;
+  }
+  if (!OV_ARRAY_PUSH(&editor->selected_item_ids, item_id)) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+    return false;
+  }
+  return true;
+}
+
+// Remove an item ID from the multi-selection
+static void multisel_remove(struct ptk_anm2editor *editor, uint32_t item_id) {
+  size_t const len = OV_ARRAY_LENGTH(editor->selected_item_ids);
+  for (size_t i = 0; i < len; i++) {
+    if (editor->selected_item_ids[i] == item_id) {
+      // Move last item to this position and shrink
+      editor->selected_item_ids[i] = editor->selected_item_ids[len - 1];
+      OV_ARRAY_SET_LENGTH(editor->selected_item_ids, len - 1);
+      return;
+    }
+  }
+}
+
+// Toggle an item ID in the multi-selection
+static bool multisel_toggle(struct ptk_anm2editor *editor, uint32_t item_id, struct ov_error *const err) {
+  if (multisel_contains(editor, item_id)) {
+    multisel_remove(editor, item_id);
+    return true;
+  }
+  if (!multisel_add(editor, item_id, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    return false;
+  }
+  return true;
+}
+
+// Get the number of selected items
+static size_t multisel_count(struct ptk_anm2editor const *editor) { return OV_ARRAY_LENGTH(editor->selected_item_ids); }
+
+// Get the selected item IDs array
+static uint32_t const *multisel_get_ids(struct ptk_anm2editor const *editor) { return editor->selected_item_ids; }
+
+// Remove any selected item IDs that no longer exist in the document
+static void multisel_cleanup_invalid(struct ptk_anm2editor *editor) {
+  if (!editor->doc || !editor->selected_item_ids) {
+    return;
+  }
+  size_t i = 0;
+  while (i < OV_ARRAY_LENGTH(editor->selected_item_ids)) {
+    uint32_t const id = editor->selected_item_ids[i];
+    size_t sel_idx = 0, item_idx = 0;
+    if (!ptk_anm2_find_item_by_id(editor->doc, id, &sel_idx, &item_idx)) {
+      // Item no longer exists - remove from selection
+      size_t const len = OV_ARRAY_LENGTH(editor->selected_item_ids);
+      editor->selected_item_ids[i] = editor->selected_item_ids[len - 1];
+      OV_ARRAY_SET_LENGTH(editor->selected_item_ids, len - 1);
+      // Don't increment i - check the swapped item
+    } else {
+      i++;
+    }
+  }
+}
+
+// Add a single item in range to multi-selection (helper for range loop)
+static bool
+multisel_add_range_item(struct ptk_anm2editor *editor, size_t sel_idx, size_t item_idx, struct ov_error *const err) {
+  uint32_t const id = ptk_anm2_item_get_id(editor->doc, sel_idx, item_idx);
+  if (!multisel_add(editor, id, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    return false;
+  }
+  return true;
+}
+
+// Add items in document order between two item IDs to multi-selection
+static bool
+multisel_add_range_by_id(struct ptk_anm2editor *editor, uint32_t from_id, uint32_t to_id, struct ov_error *const err) {
+  if (from_id == 0 || to_id == 0 || !editor->doc) {
+    return true;
+  }
+
+  // Find positions of both items
+  size_t from_sel = 0, from_item = 0;
+  size_t to_sel = 0, to_item = 0;
+  if (!ptk_anm2_find_item_by_id(editor->doc, from_id, &from_sel, &from_item)) {
+    return true;
+  }
+  if (!ptk_anm2_find_item_by_id(editor->doc, to_id, &to_sel, &to_item)) {
+    return true;
+  }
+
+  // Ensure from is before to in document order
+  if (from_sel > to_sel || (from_sel == to_sel && from_item > to_item)) {
+    size_t tmp_sel = from_sel;
+    size_t tmp_item = from_item;
+    from_sel = to_sel;
+    from_item = to_item;
+    to_sel = tmp_sel;
+    to_item = tmp_item;
+  }
+
+  bool success = false;
+
+  // Add all items in range
+  size_t const sel_count = ptk_anm2_selector_count(editor->doc);
+  for (size_t sel_idx = from_sel; sel_idx <= to_sel && sel_idx < sel_count; sel_idx++) {
+    size_t const item_count = ptk_anm2_item_count(editor->doc, sel_idx);
+    size_t start_item = (sel_idx == from_sel) ? from_item : 0;
+    size_t end_item = (sel_idx == to_sel) ? to_item : item_count - 1;
+
+    for (size_t item_idx = start_item; item_idx <= end_item && item_idx < item_count; item_idx++) {
+      if (!multisel_add_range_item(editor, sel_idx, item_idx, err)) {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+    }
+  }
+
+  success = true;
+
+cleanup:
+  return success;
+}
 
 // Get the Script directory path (DLL/../Script/)
 static bool get_script_dir(wchar_t **const dir, struct ov_error *const err) {
@@ -1372,71 +1521,90 @@ static void detail_list_add_row(HWND listview, char const *property, char const 
   SendMessageW(listview, LVM_SETITEMTEXTW, (WPARAM)idx, (LPARAM)&lvi);
 }
 
+// Populate detail panel for multi-selection mode
+// Shows value items in tree view order (ignores animation items)
+static void update_detail_panel_multisel(struct ptk_anm2editor *editor) {
+  // Iterate through tree in order to collect selected value items
+  size_t const sel_count = ptk_anm2_selector_count(editor->doc);
+  for (size_t sel_idx = 0; sel_idx < sel_count; sel_idx++) {
+    size_t const item_count = ptk_anm2_item_count(editor->doc, sel_idx);
+    for (size_t item_idx = 0; item_idx < item_count; item_idx++) {
+      uint32_t const id = ptk_anm2_item_get_id(editor->doc, sel_idx, item_idx);
+      if (!multisel_contains(editor, id)) {
+        continue;
+      }
+      if (ptk_anm2_item_is_animation(editor->doc, sel_idx, item_idx)) {
+        continue;
+      }
+      char const *name = ptk_anm2_item_get_name(editor->doc, sel_idx, item_idx);
+      char const *value = ptk_anm2_item_get_value(editor->doc, sel_idx, item_idx);
+      detail_list_add_row(editor->detaillist, name, value, (LPARAM)id);
+    }
+  }
+}
+
+// Populate detail panel for no selection or selector selection
+static void update_detail_panel_document(struct ptk_anm2editor *editor) {
+  detail_list_add_row(
+      editor->detaillist, pgettext("anm2editor", "Label"), ptk_anm2_get_label(editor->doc), DETAILLIST_LPARAM_LABEL);
+  detail_list_add_row(editor->detaillist,
+                      pgettext("anm2editor", "Information"),
+                      ptk_anm2_get_information(editor->doc),
+                      DETAILLIST_LPARAM_INFORMATION);
+  detail_list_add_row(editor->detaillist,
+                      pgettext("anm2editor", "PSD File Path"),
+                      ptk_anm2_get_psd_path(editor->doc),
+                      DETAILLIST_LPARAM_PSD_PATH);
+  detail_list_add_row(editor->detaillist,
+                      pgettext("anm2editor", "Exclusive Support Default"),
+                      ptk_anm2_get_exclusive_support_default(editor->doc) ? "1" : "",
+                      DETAILLIST_LPARAM_EXCLUSIVE_SUPPORT_DEFAULT);
+}
+
+// Populate detail panel for single item selection
+static void update_detail_panel_item(struct ptk_anm2editor *editor, size_t sel_idx, size_t item_idx) {
+  if (sel_idx >= ptk_anm2_selector_count(editor->doc)) {
+    return;
+  }
+  if (item_idx >= ptk_anm2_item_count(editor->doc, sel_idx)) {
+    return;
+  }
+
+  bool const is_animation = ptk_anm2_item_is_animation(editor->doc, sel_idx, item_idx);
+  if (is_animation) {
+    size_t const num_params = ptk_anm2_param_count(editor->doc, sel_idx, item_idx);
+    for (size_t i = 0; i < num_params; i++) {
+      char const *key = ptk_anm2_param_get_key(editor->doc, sel_idx, item_idx, i);
+      char const *value = ptk_anm2_param_get_value(editor->doc, sel_idx, item_idx, i);
+      detail_list_add_row(editor->detaillist, key, value, (LPARAM)i);
+    }
+    detail_list_add_row(editor->detaillist, pgettext("anm2editor", "(Add new...)"), "", DETAILLIST_LPARAM_PLACEHOLDER);
+  } else {
+    char const *name = ptk_anm2_item_get_name(editor->doc, sel_idx, item_idx);
+    char const *value = ptk_anm2_item_get_value(editor->doc, sel_idx, item_idx);
+    detail_list_add_row(editor->detaillist, name, value, (LPARAM)0);
+  }
+}
+
 static void update_detail_panel(struct ptk_anm2editor *editor) {
   if (!editor || !editor->detaillist || !editor->doc) {
     return;
   }
 
-  // Clear existing items
   SendMessageW(editor->detaillist, LVM_DELETEALLITEMS, 0, 0);
 
-  // Get selected item
-  size_t sel_idx = 0;
-  size_t item_idx = 0;
-  int const sel_type = get_selected_indices(editor, &sel_idx, &item_idx);
-
-  if (sel_type == 0 || sel_type == 1) {
-    // Nothing selected or Selector selected - show Label and PSD file path
-    detail_list_add_row(
-        editor->detaillist, pgettext("anm2editor", "Label"), ptk_anm2_get_label(editor->doc), DETAILLIST_LPARAM_LABEL);
-    detail_list_add_row(editor->detaillist,
-                        pgettext("anm2editor", "Information"),
-                        ptk_anm2_get_information(editor->doc),
-                        DETAILLIST_LPARAM_INFORMATION);
-    detail_list_add_row(editor->detaillist,
-                        pgettext("anm2editor", "PSD File Path"),
-                        ptk_anm2_get_psd_path(editor->doc),
-                        DETAILLIST_LPARAM_PSD_PATH);
-    detail_list_add_row(editor->detaillist,
-                        pgettext("anm2editor", "Exclusive Support Default"),
-                        ptk_anm2_get_exclusive_support_default(editor->doc) ? "1" : "",
-                        DETAILLIST_LPARAM_EXCLUSIVE_SUPPORT_DEFAULT);
-    goto cleanup;
-  }
-
-  if (sel_idx >= ptk_anm2_selector_count(editor->doc)) {
-    goto cleanup;
-  }
-
-  // Item selected (sel_type == 2)
-  if (item_idx >= ptk_anm2_item_count(editor->doc, sel_idx)) {
-    goto cleanup;
-  }
-
-  {
-    bool const is_animation = ptk_anm2_item_is_animation(editor->doc, sel_idx, item_idx);
-
-    if (is_animation) {
-      // Animation item - show all parameters
-      size_t const num_params = ptk_anm2_param_count(editor->doc, sel_idx, item_idx);
-      for (size_t i = 0; i < num_params; i++) {
-        char const *key = ptk_anm2_param_get_key(editor->doc, sel_idx, item_idx, i);
-        char const *value = ptk_anm2_param_get_value(editor->doc, sel_idx, item_idx, i);
-        detail_list_add_row(editor->detaillist, key, value, (LPARAM)i);
-      }
-      // Add placeholder row for adding new parameter
-      detail_list_add_row(
-          editor->detaillist, pgettext("anm2editor", "(Add new...)"), "", DETAILLIST_LPARAM_PLACEHOLDER);
+  if (multisel_count(editor) > 1) {
+    update_detail_panel_multisel(editor);
+  } else {
+    size_t sel_idx = 0;
+    size_t item_idx = 0;
+    int const sel_type = get_selected_indices(editor, &sel_idx, &item_idx);
+    if (sel_type == 2) {
+      update_detail_panel_item(editor, sel_idx, item_idx);
     } else {
-      // Value item - show item name with value
-      char const *name = ptk_anm2_item_get_name(editor->doc, sel_idx, item_idx);
-      char const *value = ptk_anm2_item_get_value(editor->doc, sel_idx, item_idx);
-      detail_list_add_row(editor->detaillist, name, value, (LPARAM)0);
+      update_detail_panel_document(editor);
     }
   }
-
-cleanup:
-  (void)0;
 }
 
 // Helper to update a single row's text in the detail list
@@ -1690,6 +1858,16 @@ static void on_doc_change(void *userdata,
   struct ptk_anm2editor *editor = (struct ptk_anm2editor *)userdata;
   if (!editor) {
     return;
+  }
+
+  // Clear multi-selection on document reset
+  if (op_type == ptk_anm2_op_reset) {
+    multisel_clear(editor);
+  }
+
+  // Clean up invalid selections when items are removed
+  if (op_type == ptk_anm2_op_item_remove) {
+    multisel_cleanup_invalid(editor);
   }
 
   // Update focus tracking
@@ -2189,6 +2367,40 @@ static void commit_inline_edit(struct ptk_anm2editor *editor) {
       success = true;
       goto cleanup;
     }
+  }
+
+  // Multi-selection mode: lParam contains item ID
+  if (detaillist_is_multisel_item(editor->edit_lparam)) {
+    uint32_t const item_id = (uint32_t)editor->edit_lparam;
+    size_t sel_idx = 0;
+    size_t item_idx = 0;
+    if (ptk_anm2_find_item_by_id(editor->doc, item_id, &sel_idx, &item_idx)) {
+      // Value items only in multi-selection mode (animation items are skipped)
+      char const *value = new_value_utf8 ? new_value_utf8 : "";
+      if (editor->edit_column == 0) {
+        // Editing Name column
+        char const *current = ptk_anm2_item_get_name(editor->doc, sel_idx, item_idx);
+        if (strcmp(value, current ? current : "") != 0) {
+          if (!ptk_anm2_item_set_name(editor->doc, sel_idx, item_idx, value, &err)) {
+            OV_ERROR_ADD_TRACE(&err);
+            goto cleanup;
+          }
+          mark_modified(editor);
+        }
+      } else {
+        // Editing Value column
+        char const *current = ptk_anm2_item_get_value(editor->doc, sel_idx, item_idx);
+        if (strcmp(value, current ? current : "") != 0) {
+          if (!ptk_anm2_item_set_value(editor->doc, sel_idx, item_idx, value, &err)) {
+            OV_ERROR_ADD_TRACE(&err);
+            goto cleanup;
+          }
+          mark_modified(editor);
+        }
+      }
+    }
+    success = true;
+    goto cleanup;
   }
 
   // Get currently selected item to update
@@ -2909,23 +3121,85 @@ static void handle_cmd_add_selector(struct ptk_anm2editor *editor) {
   }
 }
 
-// Command handler for ID_EDIT_DELETE
+// Delete a single item by ID (helper for multi-selection delete loop)
+static bool delete_item_by_id(struct ptk_anm2editor *editor, uint32_t id, struct ov_error *const err) {
+  size_t item_sel_idx = 0;
+  size_t item_item_idx = 0;
+  if (!ptk_anm2_find_item_by_id(editor->doc, id, &item_sel_idx, &item_item_idx)) {
+    return true; // Item already deleted or doesn't exist - not an error
+  }
+  if (!delete_item(editor, item_sel_idx, item_item_idx, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    return false;
+  }
+  return true;
+}
+
+// Delete all multi-selected items in a transaction
+static bool delete_multisel_items(struct ptk_anm2editor *editor, struct ov_error *const err) {
+  bool success = false;
+
+  if (!ptk_anm2_begin_transaction(editor->doc, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
+  {
+    uint32_t const *selected_ids = multisel_get_ids(editor);
+    size_t const count = multisel_count(editor);
+    for (size_t i = 0; i < count; i++) {
+      if (!delete_item_by_id(editor, selected_ids[i], err)) {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+    }
+  }
+
+  if (!ptk_anm2_end_transaction(editor->doc, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
+  multisel_clear(editor);
+  InvalidateRect(editor->treeview, NULL, FALSE);
+  success = true;
+
+cleanup:
+  if (!success) {
+    struct ov_error end_err = {0};
+    if (!ptk_anm2_end_transaction(editor->doc, &end_err)) {
+      ptk_logf_error(&end_err, "%1$hs", "%1$hs", gettext("failed to end transaction in error recovery"));
+      OV_ERROR_DESTROY(&end_err);
+    }
+  }
+  return success;
+}
+
+// Command handler for ID_EDIT_DELETE with multi-selection support
 static void handle_cmd_delete(struct ptk_anm2editor *editor) {
   struct ov_error err = {0};
   bool success = false;
   size_t sel_idx = 0;
   size_t item_idx = 0;
 
-  int const sel_type = get_selected_indices(editor, &sel_idx, &item_idx);
-  if (sel_type == 1) {
-    if (!delete_selector(editor, sel_idx, &err)) {
+  if (multisel_count(editor) > 1) {
+    if (!delete_multisel_items(editor, &err)) {
       OV_ERROR_ADD_TRACE(&err);
       goto cleanup;
     }
-  } else if (sel_type == 2) {
-    if (!delete_item(editor, sel_idx, item_idx, &err)) {
-      OV_ERROR_ADD_TRACE(&err);
-      goto cleanup;
+  } else {
+    int const sel_type = get_selected_indices(editor, &sel_idx, &item_idx);
+    if (sel_type == 1) {
+      if (!delete_selector(editor, sel_idx, &err)) {
+        OV_ERROR_ADD_TRACE(&err);
+        goto cleanup;
+      }
+    } else if (sel_type == 2) {
+      if (!delete_item(editor, sel_idx, item_idx, &err)) {
+        OV_ERROR_ADD_TRACE(&err);
+        goto cleanup;
+      }
+      multisel_clear(editor);
     }
   }
 
@@ -3716,7 +3990,125 @@ cleanup:
   return success;
 }
 
-// Helper function for drag-and-drop move operation
+// Move a single item by ID to the destination (helper for multi-selection move loop)
+static bool move_item_by_id(
+    struct ptk_anm2editor *editor, uint32_t id, size_t dst_sel, size_t dst_idx, struct ov_error *const err) {
+  size_t item_sel_idx = 0;
+  size_t item_item_idx = 0;
+  if (!ptk_anm2_find_item_by_id(editor->doc, id, &item_sel_idx, &item_item_idx)) {
+    return true; // Item no longer exists - not an error
+  }
+  if (item_sel_idx == dst_sel && item_item_idx == dst_idx) {
+    return true; // Already at destination - skip
+  }
+  if (!ptk_anm2_item_move_to(editor->doc, item_sel_idx, item_item_idx, dst_sel, dst_idx, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    return false;
+  }
+  return true;
+}
+
+// Move all multi-selected items to destination in a transaction
+static bool move_multisel_items(struct ptk_anm2editor *editor,
+                                bool dst_is_selector,
+                                size_t dst_sel,
+                                size_t dst_item_idx,
+                                struct ov_error *const err) {
+  bool success = false;
+
+  if (!ptk_anm2_begin_transaction(editor->doc, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
+  {
+    uint32_t const *selected_ids = multisel_get_ids(editor);
+    size_t const count = multisel_count(editor);
+    size_t const move_dst_idx = dst_is_selector ? ptk_anm2_item_count(editor->doc, dst_sel) : dst_item_idx;
+
+    for (size_t i = count; i > 0; i--) {
+      if (!move_item_by_id(editor, selected_ids[i - 1], dst_sel, move_dst_idx, err)) {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+    }
+  }
+
+  if (!ptk_anm2_end_transaction(editor->doc, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
+  InvalidateRect(editor->treeview, NULL, FALSE);
+  success = true;
+
+cleanup:
+  if (!success) {
+    struct ov_error end_err = {0};
+    if (!ptk_anm2_end_transaction(editor->doc, &end_err)) {
+      ptk_logf_error(&end_err, "%1$hs", "%1$hs", gettext("failed to end transaction in error recovery"));
+      OV_ERROR_DESTROY(&end_err);
+    }
+  }
+  return success;
+}
+
+// Move a single item to an item position
+static bool move_single_item_to_item(struct ptk_anm2editor *editor,
+                                     size_t src_sel,
+                                     size_t src_item_idx,
+                                     size_t dst_sel,
+                                     size_t dst_item_idx,
+                                     struct ov_error *const err) {
+  size_t const sel_count = ptk_anm2_selector_count(editor->doc);
+  if (src_sel >= sel_count || dst_sel >= sel_count) {
+    return true;
+  }
+
+  size_t const src_items_len = ptk_anm2_item_count(editor->doc, src_sel);
+  if (src_item_idx >= src_items_len) {
+    return true;
+  }
+
+  size_t const dst_items_len = ptk_anm2_item_count(editor->doc, dst_sel);
+  size_t const max_dst_idx = (src_sel == dst_sel) ? src_items_len - 1 : dst_items_len;
+  if (dst_item_idx > max_dst_idx) {
+    return true;
+  }
+
+  if (src_sel == dst_sel && src_item_idx == dst_item_idx) {
+    return true;
+  }
+
+  if (!ptk_anm2_item_move_to(editor->doc, src_sel, src_item_idx, dst_sel, dst_item_idx, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    return false;
+  }
+  return true;
+}
+
+// Move a single item onto a selector (append to end)
+static bool move_single_item_to_selector(
+    struct ptk_anm2editor *editor, size_t src_sel, size_t src_item_idx, size_t dst_sel, struct ov_error *const err) {
+  size_t const sel_count = ptk_anm2_selector_count(editor->doc);
+  if (src_sel >= sel_count || dst_sel >= sel_count || src_sel == dst_sel) {
+    return true;
+  }
+
+  size_t const src_items_len = ptk_anm2_item_count(editor->doc, src_sel);
+  if (src_item_idx >= src_items_len) {
+    return true;
+  }
+
+  size_t const dst_items_len = ptk_anm2_item_count(editor->doc, dst_sel);
+  if (!ptk_anm2_item_move_to(editor->doc, src_sel, src_item_idx, dst_sel, dst_items_len, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    return false;
+  }
+  return true;
+}
+
+// Helper function for drag-and-drop move operation with multi-selection support
 static void handle_drag_move(struct ptk_anm2editor *editor,
                              bool src_is_selector,
                              size_t src_sel,
@@ -3727,10 +4119,8 @@ static void handle_drag_move(struct ptk_anm2editor *editor,
   struct ov_error err = {0};
   bool success = false;
 
-  size_t const sel_count = ptk_anm2_selector_count(editor->doc);
-
   if (src_is_selector && dst_is_selector) {
-    // Moving selectors
+    size_t const sel_count = ptk_anm2_selector_count(editor->doc);
     if (src_sel != dst_sel && src_sel < sel_count && dst_sel < sel_count) {
       if (!ptk_anm2_selector_move_to(editor->doc, src_sel, dst_sel, &err)) {
         OV_ERROR_ADD_TRACE(&err);
@@ -3738,42 +4128,25 @@ static void handle_drag_move(struct ptk_anm2editor *editor,
       }
       mark_modified(editor);
     }
-  } else if (!src_is_selector && !dst_is_selector) {
-    // Moving items (within same selector or across selectors)
-    if (src_sel < sel_count && dst_sel < sel_count) {
-      size_t const src_items_len = ptk_anm2_item_count(editor->doc, src_sel);
-      size_t const dst_items_len = ptk_anm2_item_count(editor->doc, dst_sel);
-
-      if (src_item_idx < src_items_len) {
-        // For cross-selector move, to_idx can be up to dst_items_len (append)
-        // For same-selector move, to_idx must be < items_len
-        size_t const max_dst_idx = (src_sel == dst_sel) ? src_items_len - 1 : dst_items_len;
-
-        if (dst_item_idx <= max_dst_idx) {
-          // Skip no-op (same position in same selector)
-          if (src_sel != dst_sel || src_item_idx != dst_item_idx) {
-            if (!ptk_anm2_item_move_to(editor->doc, src_sel, src_item_idx, dst_sel, dst_item_idx, &err)) {
-              OV_ERROR_ADD_TRACE(&err);
-              goto cleanup;
-            }
-            mark_modified(editor);
-          }
-        }
+  } else if (!src_is_selector) {
+    if (multisel_count(editor) > 1) {
+      if (!move_multisel_items(editor, dst_is_selector, dst_sel, dst_item_idx, &err)) {
+        OV_ERROR_ADD_TRACE(&err);
+        goto cleanup;
       }
-    }
-  } else if (!src_is_selector && dst_is_selector) {
-    // Moving item onto a selector - append to end of that selector
-    if (src_sel < sel_count && dst_sel < sel_count && src_sel != dst_sel) {
-      size_t const src_items_len = ptk_anm2_item_count(editor->doc, src_sel);
-      size_t const dst_items_len = ptk_anm2_item_count(editor->doc, dst_sel);
-
-      if (src_item_idx < src_items_len) {
-        if (!ptk_anm2_item_move_to(editor->doc, src_sel, src_item_idx, dst_sel, dst_items_len, &err)) {
-          OV_ERROR_ADD_TRACE(&err);
-          goto cleanup;
-        }
-        mark_modified(editor);
+      mark_modified(editor);
+    } else if (dst_is_selector) {
+      if (!move_single_item_to_selector(editor, src_sel, src_item_idx, dst_sel, &err)) {
+        OV_ERROR_ADD_TRACE(&err);
+        goto cleanup;
       }
+      mark_modified(editor);
+    } else {
+      if (!move_single_item_to_item(editor, src_sel, src_item_idx, dst_sel, dst_item_idx, &err)) {
+        OV_ERROR_ADD_TRACE(&err);
+        goto cleanup;
+      }
+      mark_modified(editor);
     }
   }
 
@@ -3782,6 +4155,30 @@ static void handle_drag_move(struct ptk_anm2editor *editor,
 cleanup:
   if (!success) {
     show_error_dialog(editor, &err);
+  }
+}
+
+// Handle NM_CUSTOMDRAW for TreeView multi-selection highlighting
+static LRESULT handle_treeview_customdraw(struct ptk_anm2editor *editor, NMTVCUSTOMDRAW *nmcd) {
+  switch (nmcd->nmcd.dwDrawStage) {
+  case CDDS_PREPAINT:
+    return CDRF_NOTIFYITEMDRAW;
+  case CDDS_ITEMPREPAINT: {
+    TVITEMW tvi = {.mask = TVIF_PARAM, .hItem = (HTREEITEM)nmcd->nmcd.dwItemSpec};
+    if (!TreeView_GetItem(editor->treeview, &tvi)) {
+      return CDRF_DODEFAULT;
+    }
+    uint32_t id = 0;
+    bool const is_selector = treeview_decode_lparam(tvi.lParam, &id);
+    if (!is_selector && multisel_contains(editor, id)) {
+      nmcd->clrTextBk = GetSysColor(COLOR_HIGHLIGHT);
+      nmcd->clrText = GetSysColor(COLOR_HIGHLIGHTTEXT);
+      return CDRF_NEWFONT;
+    }
+    return CDRF_DODEFAULT;
+  }
+  default:
+    return CDRF_DODEFAULT;
   }
 }
 
@@ -4128,9 +4525,57 @@ static LRESULT CALLBACK anm2editor_wnd_proc(HWND hwnd, UINT message, WPARAM wpar
       }
       return 0;
     }
+    if (nmhdr->idFrom == IDC_TREEVIEW && nmhdr->code == NM_CUSTOMDRAW) {
+      return handle_treeview_customdraw(editor, (NMTVCUSTOMDRAW *)lparam);
+    }
     if (nmhdr->idFrom == IDC_TREEVIEW && nmhdr->code == TVN_SELCHANGEDW) {
-      // Selection changed - update detail panel and toolbar state
-      cancel_inline_edit(editor); // Cancel any pending edit
+      cancel_inline_edit(editor);
+
+      struct ov_error err = {0};
+      NMTREEVIEWW const *nmtv = (NMTREEVIEWW const *)lparam;
+      uint32_t id = 0;
+      bool is_selector = true;
+      if (nmtv->itemNew.hItem) {
+        is_selector = treeview_decode_lparam(nmtv->itemNew.lParam, &id);
+      }
+
+      bool const ctrl_pressed = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+      bool const shift_pressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+
+      if (shift_pressed && editor->anchor_item_id != 0 && !is_selector) {
+        // Shift+click: range selection from anchor to clicked item
+        if (!ctrl_pressed) {
+          multisel_clear(editor);
+        }
+        if (!multisel_add_range_by_id(editor, editor->anchor_item_id, id, &err)) {
+          show_error_dialog(editor, &err);
+        }
+        // Don't update anchor on Shift+click
+      } else if (ctrl_pressed) {
+        // Ctrl+click: toggle selection (items only)
+        if (!is_selector) {
+          if (!multisel_toggle(editor, id, &err)) {
+            show_error_dialog(editor, &err);
+          }
+          // Update anchor if item was added
+          if (multisel_contains(editor, id)) {
+            editor->anchor_item_id = id;
+          }
+        }
+      } else {
+        // Normal click: single selection
+        multisel_clear(editor);
+        if (!is_selector) {
+          if (!multisel_add(editor, id, &err)) {
+            show_error_dialog(editor, &err);
+          }
+          editor->anchor_item_id = id;
+        } else {
+          editor->anchor_item_id = 0;
+        }
+      }
+      InvalidateRect(editor->treeview, NULL, FALSE);
+
       update_detail_panel(editor);
       update_toolbar_state(editor);
       return 0;
@@ -4664,6 +5109,10 @@ void ptk_anm2editor_destroy(struct ptk_anm2editor **editor_ptr) {
 
   if (editor->file_path) {
     OV_ARRAY_DESTROY(&editor->file_path);
+  }
+
+  if (editor->selected_item_ids) {
+    OV_ARRAY_DESTROY(&editor->selected_item_ids);
   }
 
   OV_FREE(editor_ptr);
