@@ -44,6 +44,11 @@ bool ptk_config_get_manual_shift_wav(struct ptk_config const *const config,
                                      struct ov_error *const err);
 bool ptk_config_set_manual_shift_wav(struct ptk_config *const config, bool const value, struct ov_error *const err);
 
+bool ptk_config_get_manual_shift_psd(struct ptk_config const *const config,
+                                     bool *const value,
+                                     struct ov_error *const err);
+bool ptk_config_set_manual_shift_psd(struct ptk_config *const config, bool const value, struct ov_error *const err);
+
 bool ptk_config_get_manual_wav_txt_pair(struct ptk_config const *const config,
                                         bool *const value,
                                         struct ov_error *const err);

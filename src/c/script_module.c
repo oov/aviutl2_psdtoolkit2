@@ -243,6 +243,7 @@ void ptk_script_module_get_drop_config(struct ptk_script_module *const sm,
 
     char const *keys[] = {
         "manual_shift_wav",
+        "manual_shift_psd",
         "manual_wav_txt_pair",
         "manual_object_audio_text",
         "external_wav_txt_pair",
@@ -250,6 +251,7 @@ void ptk_script_module_get_drop_config(struct ptk_script_module *const sm,
     };
     int values[] = {
         config.manual_shift_wav ? 1 : 0,
+        config.manual_shift_psd ? 1 : 0,
         config.manual_wav_txt_pair ? 1 : 0,
         config.manual_object_audio_text ? 1 : 0,
         config.external_wav_txt_pair ? 1 : 0,

@@ -83,13 +83,19 @@ end
 -- Also registers the PSD file with IPC for state management
 -- @param files table List of file objects to process (will be modified if successful)
 -- @param state table Drop state with metadata
--- @param config table Configuration table (unused for now, but kept for consistency)
+-- @param config table Configuration table
 -- @return boolean True if processing was attempted (whether successful or not), false if not applicable
 function M.process(files, state, config)
 	-- Find first PSD file in the list
 	local psd_index, psd_path = M.find_psd(files)
 	if not psd_path then
 		-- No PSD file found, not applicable to this handler
+		return false
+	end
+
+	-- Check if shift key requirement is enabled and not met
+	if config.manual_shift_psd ~= 0 and not state.shift then
+		dbg("PSDToolKit: PSD processing skipped (Shift key not pressed)")
 		return false
 	end
 

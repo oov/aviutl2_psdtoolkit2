@@ -35,6 +35,7 @@ struct ptk_script_module_set_props_result {
  */
 struct ptk_script_module_drop_config {
   bool manual_shift_wav;
+  bool manual_shift_psd;
   bool manual_wav_txt_pair;
   bool manual_object_audio_text;
   bool external_wav_txt_pair;

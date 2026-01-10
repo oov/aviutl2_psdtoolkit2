@@ -269,6 +269,10 @@ msgctxt "config"
 msgid "OK"
 msgstr "OK"
 
+msgctxt "config"
+msgid "Only create PSD file object when dropping *.&psd/*.psb file while holding Shift key"
+msgstr "Shiftキーを押しながらドロップしたときだけPSDファイルオブジェクトを作成する"
+
 msgctxt "anm2editor"
 msgid "Open"
 msgstr "開く"
@@ -279,6 +283,10 @@ msgstr "処理に失敗しました。"
 msgctxt ".ptk.anm2 label"
 msgid "PSD"
 msgstr "PSD"
+
+msgctxt "config"
+msgid "PSD File Drop"
+msgstr "PSDファイルドロップ"
 
 msgctxt "anm2editor"
 msgid "PSD File Path"

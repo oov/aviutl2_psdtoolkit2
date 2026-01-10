@@ -127,6 +127,7 @@ static bool sm_get_drop_config(void *const userdata,
   config->name = b
 
   GET_CONFIG(manual_shift_wav);
+  GET_CONFIG(manual_shift_psd);
   GET_CONFIG(manual_wav_txt_pair);
   GET_CONFIG(manual_object_audio_text);
   GET_CONFIG(external_wav_txt_pair);

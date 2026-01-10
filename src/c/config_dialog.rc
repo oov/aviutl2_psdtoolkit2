@@ -9,13 +9,13 @@
 
 LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
 
-PTKCONFIGDIALOG DIALOGEX 0, 0, 400, 240
+PTKCONFIGDIALOG DIALOGEX 0, 0, 400, 274
 CAPTION "PSDToolKit Settings"
 STYLE DS_CENTER | DS_MODALFRAME | WS_POPUPWINDOW | WS_CAPTION | WS_VISIBLE
 FONT 9, "Segoe UI", 400, 0, 128
 {
-    DEFPUSHBUTTON "&OK", IDOK, 276, 218, 56, 14
-    PUSHBUTTON "&Cancel", IDCANCEL, 336, 218, 56, 14
+    DEFPUSHBUTTON "&OK", IDOK, 276, 252, 56, 14
+    PUSHBUTTON "&Cancel", IDCANCEL, 336, 252, 56, 14
 
     GROUPBOX "Audio File Drop Extension", 100, 8, 4, 384, 176
 
@@ -32,8 +32,11 @@ FONT 9, "Segoe UI", 400, 0, 128
     AUTOCHECKBOX "When dropping *.wav and *.txt files with the same name t&ogether", 131, 32, 112, 344, 10
     AUTOCHECKBOX "When dropping *.object containing only a&udio and text on the same frame", 132, 32, 126, 344, 10
 
-    GROUPBOX "Debug", 140, 8, 184, 384, 28
-    AUTOCHECKBOX "Enable &debug mode", 141, 16, 196, 368, 10
+    GROUPBOX "PSD File Drop", 140, 8, 184, 384, 28
+    AUTOCHECKBOX "Only create PSD file object when dropping *.&psd/*.psb file while holding Shift key", 141, 16, 196, 368, 10
+
+    GROUPBOX "Debug", 150, 8, 218, 384, 28
+    AUTOCHECKBOX "Enable &debug mode", 151, 16, 230, 368, 10
 }
 
 #ifdef APSTUDIO_INVOKED
