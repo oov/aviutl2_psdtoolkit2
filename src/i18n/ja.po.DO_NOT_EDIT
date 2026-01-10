@@ -30,6 +30,10 @@ msgctxt "anm2editor"
 msgid "(Add new...)"
 msgstr "(新規追加...)"
 
+msgctxt ".ptk.anm2 Unselected item name for selector"
+msgid "(None)"
+msgstr "(未選択)"
+
 msgctxt "anm2editor"
 msgid "(Unnamed Item)"
 msgstr "(名称未設定アイテム)"
