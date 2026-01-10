@@ -322,6 +322,10 @@ msgstr "PSDToolKit anm2 エディター"
 msgid "PSDToolKit anm2 Editor is not open."
 msgstr "PSDToolKit anm2 Editor が開いていません。"
 
+#, c-format
+msgid "PSDToolKit requires AviUtl ExEdit2 %1$s or later."
+msgstr "PSDToolKit には AviUtl ExEdit2 %1$s 以降が必要です。"
+
 msgctxt "anm2editor"
 msgid "Property"
 msgstr "プロパティ"
@@ -493,9 +497,6 @@ msgstr "エディットセクションがありません。"
 msgid "failed to add PSD file."
 msgstr "PSDファイルの追加に失敗しました。"
 
-msgid "failed to create plugin window."
-msgstr "プラグインウィンドウの作成に失敗しました。"
-
 msgid "failed to draw PSD image."
 msgstr "PSD画像の描画に失敗しました。"
 
@@ -514,6 +515,15 @@ msgstr "投げ込み設定の取得に失敗しました。"
 msgid "failed to get preferred languages."
 msgstr "優先言語設定の取得に失敗しました。"
 
+msgid "failed to get required functions from GCMZDrops.aux2 plug-in."
+msgstr "GCMZDrops.aux2 プラグインから必要な関数の取得に失敗しました。"
+
+msgid "failed to initialize plugin."
+msgstr "プラグインの初期化に失敗しました。"
+
+msgid "failed to load GCMZDrops.aux2 plug-in."
+msgstr "GCMZDrops.aux2 プラグインの読み込みに失敗しました。"
+
 msgid "failed to load config, continuing with default settings."
 msgstr "設定の読み込みに失敗しました、デフォルト設定で継続します。"
 
@@ -522,6 +532,9 @@ msgstr "言語リソースの取得に失敗しました。継続します。"
 
 msgid "failed to read text file."
 msgstr "テキストファイルの読み取りに失敗しました。"
+
+msgid "failed to register plugin."
+msgstr "プラグインの登録に失敗しました。"
 
 msgid "failed to set %1$hs on %2$hs."
 msgstr "%2$hs 上の %1$hs の書き換えに失敗しました。"

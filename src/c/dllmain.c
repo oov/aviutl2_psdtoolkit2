@@ -171,7 +171,7 @@ BOOL __declspec(dllexport) InitializePlugin(DWORD version) {
                   ov_error_type_generic,
                   ov_error_generic_fail,
                   "%1$s",
-                  gettext("GCMZDrops requires AviUtl ExEdit2 %1$s or later."),
+                  gettext("PSDToolKit requires AviUtl ExEdit2 %1$s or later."),
                   "version2.0beta27");
     OV_ERROR_ADD_TRACE(&err);
     goto cleanup;
