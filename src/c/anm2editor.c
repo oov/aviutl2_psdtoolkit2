@@ -333,46 +333,29 @@ static bool treeview_decode_lparam(LPARAM lparam, uint32_t *out_id) {
 }
 
 // =============================================================================
-// ListView (detail list) lParam encoding/decoding
+// ListView (detail list) row type and metadata
 // =============================================================================
-// Normal parameter row: param index (0, 1, 2, ...)
-// Placeholder row for adding new parameter: DETAILLIST_LPARAM_PLACEHOLDER
-// Special rows (PSD path, Layer Selection label): DETAILLIST_LPARAM_NOT_EDITABLE
+// Each row in the detail list has associated metadata stored in an array.
+// The lParam of each ListView item contains the index into this array.
 
-#define DETAILLIST_LPARAM_PLACEHOLDER ((LPARAM) - 1)
-#define DETAILLIST_LPARAM_NOT_EDITABLE ((LPARAM) - 2)
-#define DETAILLIST_LPARAM_LABEL ((LPARAM) - 3)
-#define DETAILLIST_LPARAM_PSD_PATH ((LPARAM) - 4)
-#define DETAILLIST_LPARAM_EXCLUSIVE_SUPPORT_DEFAULT ((LPARAM) - 5)
-#define DETAILLIST_LPARAM_INFORMATION ((LPARAM) - 6)
+enum detaillist_row_type {
+  detaillist_row_type_placeholder,               // "(Add new...)" placeholder
+  detaillist_row_type_label,                     // Label property (document level)
+  detaillist_row_type_psd_path,                  // PSD File Path property (document level)
+  detaillist_row_type_exclusive_support_default, // Exclusive Support Default property (document level)
+  detaillist_row_type_information,               // Information property (document level)
+  detaillist_row_type_multisel_item,             // Value item in multi-selection mode
+  detaillist_row_type_animation_param,           // Animation item parameter
+  detaillist_row_type_value_item,                // Value item (single selection)
+};
 
-static bool detaillist_is_placeholder(LPARAM lparam) { return lparam == DETAILLIST_LPARAM_PLACEHOLDER; }
-
-static bool detaillist_is_label_row(LPARAM lparam) { return lparam == DETAILLIST_LPARAM_LABEL; }
-
-static bool detaillist_is_psd_path_row(LPARAM lparam) { return lparam == DETAILLIST_LPARAM_PSD_PATH; }
-
-static bool detaillist_is_exclusive_support_default_row(LPARAM lparam) {
-  return lparam == DETAILLIST_LPARAM_EXCLUSIVE_SUPPORT_DEFAULT;
-}
-
-static bool detaillist_is_information_row(LPARAM lparam) { return lparam == DETAILLIST_LPARAM_INFORMATION; }
-
-static bool detaillist_is_editable_param(LPARAM lparam) {
-  return lparam != DETAILLIST_LPARAM_PLACEHOLDER && lparam != DETAILLIST_LPARAM_NOT_EDITABLE &&
-         lparam != DETAILLIST_LPARAM_LABEL && lparam != DETAILLIST_LPARAM_PSD_PATH &&
-         lparam != DETAILLIST_LPARAM_EXCLUSIVE_SUPPORT_DEFAULT && lparam != DETAILLIST_LPARAM_INFORMATION;
-}
-
-static bool detaillist_is_editable(LPARAM lparam) {
-  return lparam != DETAILLIST_LPARAM_PLACEHOLDER && lparam != DETAILLIST_LPARAM_NOT_EDITABLE;
-}
-
-// Check if lParam represents an item ID in multi-selection mode
-// Item IDs are positive 32-bit values, special constants are negative
-static bool detaillist_is_multisel_item(LPARAM lparam) { return lparam > 0 && lparam <= UINT32_MAX; }
-
-static size_t detaillist_get_param_index(LPARAM lparam) { return (size_t)lparam; }
+struct detaillist_row_info {
+  enum detaillist_row_type type;
+  union {
+    uint32_t item_id;   // For multisel_item: the item's unique ID
+    size_t param_index; // For animation_param: parameter index
+  };
+};
 
 // Build file filter string for file dialogs
 // Uses | as separator, then replaces with \0
@@ -419,14 +402,17 @@ struct ptk_anm2editor {
   int splitter_pos; // X position of splitter (left edge)
   bool splitter_dragging;
 
+  // Detail list row metadata (ovarray, corresponds 1:1 with ListView rows)
+  struct detaillist_row_info *detaillist_rows;
+
   // Inline edit state for detail list
-  HWND edit_control;    // Edit control for inline editing
-  int edit_row;         // Row being edited (-1 if not editing)
-  int edit_column;      // Column being edited (0=Name, 1=Value)
-  LPARAM edit_lparam;   // lParam of the row being edited
-  WNDPROC edit_oldproc; // Original window procedure for edit control
-  bool edit_committing; // Reentrancy guard for commit/cancel
-  bool edit_adding_new; // True if editing a new parameter (not yet added to doc)
+  HWND edit_control;     // Edit control for inline editing
+  int edit_row;          // Row being edited (-1 if not editing)
+  int edit_column;       // Column being edited (0=Name, 1=Value)
+  size_t edit_row_index; // Index into detaillist_rows for the row being edited
+  WNDPROC edit_oldproc;  // Original window procedure for edit control
+  bool edit_committing;  // Reentrancy guard for commit/cancel
+  bool edit_adding_new;  // True if editing a new parameter (not yet added to doc)
 
   // TreeView edit state
   bool adding_new_selector; // True if editing a new selector name (not yet added to doc)
@@ -444,6 +430,102 @@ struct ptk_anm2editor {
   uint32_t *selected_item_ids; // ovarray of item IDs
   uint32_t anchor_item_id;     // Anchor item ID for Shift+click range selection (0 = none)
 };
+
+// =============================================================================
+// Detail list row metadata management
+// =============================================================================
+
+// Clear all row metadata
+static void detaillist_rows_clear(struct ptk_anm2editor *editor) {
+  if (editor->detaillist_rows) {
+    OV_ARRAY_SET_LENGTH(editor->detaillist_rows, 0);
+  }
+}
+
+// Add row metadata and return the index (for use as lParam)
+static bool detaillist_rows_add(struct ptk_anm2editor *editor,
+                                struct detaillist_row_info const *info,
+                                size_t *out_index,
+                                struct ov_error *const err) {
+  size_t const idx = OV_ARRAY_LENGTH(editor->detaillist_rows);
+  if (!OV_ARRAY_PUSH(&editor->detaillist_rows, *info)) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+    return false;
+  }
+  if (out_index) {
+    *out_index = idx;
+  }
+  return true;
+}
+
+// Insert row metadata at a specific index
+static bool detaillist_rows_insert_at(struct ptk_anm2editor *editor,
+                                      size_t index,
+                                      struct detaillist_row_info const *info,
+                                      struct ov_error *const err) {
+  size_t const len = OV_ARRAY_LENGTH(editor->detaillist_rows);
+  if (index > len) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
+    return false;
+  }
+  // First, grow the array by pushing a copy of the info (will be overwritten)
+  if (!OV_ARRAY_PUSH(&editor->detaillist_rows, *info)) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+    return false;
+  }
+  // Shift elements from index to end
+  for (size_t i = len; i > index; i--) {
+    editor->detaillist_rows[i] = editor->detaillist_rows[i - 1];
+  }
+  editor->detaillist_rows[index] = *info;
+  return true;
+}
+
+// Remove row metadata at a specific index
+static void detaillist_rows_remove_at(struct ptk_anm2editor *editor, size_t index) {
+  size_t const len = OV_ARRAY_LENGTH(editor->detaillist_rows);
+  if (index >= len) {
+    return;
+  }
+  // Shift elements from index+1 to end
+  for (size_t i = index; i < len - 1; i++) {
+    editor->detaillist_rows[i] = editor->detaillist_rows[i + 1];
+  }
+  OV_ARRAY_SET_LENGTH(editor->detaillist_rows, len - 1);
+}
+
+// Get row metadata by index (returns NULL if index is invalid)
+static struct detaillist_row_info const *detaillist_rows_get(struct ptk_anm2editor const *editor, size_t index) {
+  if (index >= OV_ARRAY_LENGTH(editor->detaillist_rows)) {
+    return NULL;
+  }
+  return &editor->detaillist_rows[index];
+}
+
+// Find row index by type (returns SIZE_MAX if not found)
+static size_t detaillist_rows_find_by_type(struct ptk_anm2editor const *editor, enum detaillist_row_type type) {
+  size_t const len = OV_ARRAY_LENGTH(editor->detaillist_rows);
+  for (size_t i = 0; i < len; i++) {
+    if (editor->detaillist_rows[i].type == type) {
+      return i;
+    }
+  }
+  return SIZE_MAX;
+}
+
+// Check if a row type is editable (can be edited inline)
+static bool detaillist_row_type_is_editable(enum detaillist_row_type type) {
+  return type != detaillist_row_type_placeholder;
+}
+
+// Check if a row type represents an editable parameter (for delete operation)
+static bool detaillist_row_type_is_deletable_param(enum detaillist_row_type type) {
+  return type == detaillist_row_type_animation_param;
+}
+
+// =============================================================================
+// Multi-selection management
+// =============================================================================
 
 // Clear all multi-selections
 static void multisel_clear(struct ptk_anm2editor *editor) {
@@ -1501,89 +1583,187 @@ static int get_selected_indices(struct ptk_anm2editor *editor, size_t *selector_
 }
 
 // Helper function to add a row to the detail list with UTF-8 property and value
-static void detail_list_add_row(HWND listview, char const *property, char const *value, LPARAM lparam) {
-  int const idx = (int)SendMessageW(listview, LVM_GETITEMCOUNT, 0, 0);
+// Add a row to the detail list with metadata
+static bool detail_list_add_row(struct ptk_anm2editor *editor,
+                                char const *property,
+                                char const *value,
+                                struct detaillist_row_info const *info,
+                                struct ov_error *const err) {
+  size_t meta_idx = 0;
+  if (!detaillist_rows_add(editor, info, &meta_idx, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    return false;
+  }
+
+  int const idx = (int)SendMessageW(editor->detaillist, LVM_GETITEMCOUNT, 0, 0);
   wchar_t prop_buf[256];
   wchar_t val_buf[512];
   ov_snprintf_char2wchar(prop_buf, sizeof(prop_buf) / sizeof(prop_buf[0]), "%1$hs", "%1$hs", property ? property : "");
   ov_snprintf_char2wchar(val_buf, sizeof(val_buf) / sizeof(val_buf[0]), "%1$hs", "%1$hs", value ? value : "");
 
-  LVITEMW lvi = {
-      .mask = LVIF_TEXT | LVIF_PARAM,
-      .iItem = idx,
-      .iSubItem = 0,
-      .pszText = prop_buf,
-      .lParam = lparam,
-  };
-  SendMessageW(listview, LVM_INSERTITEMW, 0, (LPARAM)&lvi);
-  lvi.iSubItem = 1;
-  lvi.pszText = val_buf;
-  SendMessageW(listview, LVM_SETITEMTEXTW, (WPARAM)idx, (LPARAM)&lvi);
+  SendMessageW(editor->detaillist,
+               LVM_INSERTITEMW,
+               0,
+               (LPARAM) & (LVITEMW){
+                              .mask = LVIF_TEXT | LVIF_PARAM,
+                              .iItem = idx,
+                              .iSubItem = 0,
+                              .pszText = prop_buf,
+                              .lParam = (LPARAM)meta_idx,
+                          });
+  SendMessageW(editor->detaillist,
+               LVM_SETITEMTEXTW,
+               (WPARAM)idx,
+               (LPARAM) & (LVITEMW){
+                              .iSubItem = 1,
+                              .pszText = val_buf,
+                          });
+  return true;
 }
 
 // Populate detail panel for multi-selection mode
 // Shows value items in tree view order (ignores animation items)
-static void update_detail_panel_multisel(struct ptk_anm2editor *editor) {
-  // Iterate through tree in order to collect selected value items
-  size_t const sel_count = ptk_anm2_selector_count(editor->doc);
-  for (size_t sel_idx = 0; sel_idx < sel_count; sel_idx++) {
-    size_t const item_count = ptk_anm2_item_count(editor->doc, sel_idx);
-    for (size_t item_idx = 0; item_idx < item_count; item_idx++) {
-      uint32_t const id = ptk_anm2_item_get_id(editor->doc, sel_idx, item_idx);
-      if (!multisel_contains(editor, id)) {
-        continue;
+static bool update_detail_panel_multisel(struct ptk_anm2editor *editor, struct ov_error *const err) {
+  bool success = false;
+
+  {
+    // Iterate through tree in order to collect selected value items
+    size_t const sel_count = ptk_anm2_selector_count(editor->doc);
+    for (size_t sel_idx = 0; sel_idx < sel_count; sel_idx++) {
+      size_t const item_count = ptk_anm2_item_count(editor->doc, sel_idx);
+      for (size_t item_idx = 0; item_idx < item_count; item_idx++) {
+        uint32_t const id = ptk_anm2_item_get_id(editor->doc, sel_idx, item_idx);
+        if (!multisel_contains(editor, id)) {
+          continue;
+        }
+        if (ptk_anm2_item_is_animation(editor->doc, sel_idx, item_idx)) {
+          continue;
+        }
+        char const *name = ptk_anm2_item_get_name(editor->doc, sel_idx, item_idx);
+        char const *value = ptk_anm2_item_get_value(editor->doc, sel_idx, item_idx);
+        if (!detail_list_add_row(editor,
+                                 name,
+                                 value,
+                                 &(struct detaillist_row_info){
+                                     .type = detaillist_row_type_multisel_item,
+                                     .item_id = id,
+                                 },
+                                 err)) {
+          OV_ERROR_ADD_TRACE(err);
+          goto cleanup;
+        }
       }
-      if (ptk_anm2_item_is_animation(editor->doc, sel_idx, item_idx)) {
-        continue;
-      }
-      char const *name = ptk_anm2_item_get_name(editor->doc, sel_idx, item_idx);
-      char const *value = ptk_anm2_item_get_value(editor->doc, sel_idx, item_idx);
-      detail_list_add_row(editor->detaillist, name, value, (LPARAM)id);
     }
   }
+
+  success = true;
+
+cleanup:
+  return success;
 }
 
 // Populate detail panel for no selection or selector selection
-static void update_detail_panel_document(struct ptk_anm2editor *editor) {
-  detail_list_add_row(
-      editor->detaillist, pgettext("anm2editor", "Label"), ptk_anm2_get_label(editor->doc), DETAILLIST_LPARAM_LABEL);
-  detail_list_add_row(editor->detaillist,
-                      pgettext("anm2editor", "Information"),
-                      ptk_anm2_get_information(editor->doc),
-                      DETAILLIST_LPARAM_INFORMATION);
-  detail_list_add_row(editor->detaillist,
-                      pgettext("anm2editor", "PSD File Path"),
-                      ptk_anm2_get_psd_path(editor->doc),
-                      DETAILLIST_LPARAM_PSD_PATH);
-  detail_list_add_row(editor->detaillist,
-                      pgettext("anm2editor", "Exclusive Support Default"),
-                      ptk_anm2_get_exclusive_support_default(editor->doc) ? "1" : "",
-                      DETAILLIST_LPARAM_EXCLUSIVE_SUPPORT_DEFAULT);
+static bool update_detail_panel_document(struct ptk_anm2editor *editor, struct ov_error *const err) {
+  bool success = false;
+
+  {
+    if (!detail_list_add_row(editor,
+                             pgettext("anm2editor", "Label"),
+                             ptk_anm2_get_label(editor->doc),
+                             &(struct detaillist_row_info){.type = detaillist_row_type_label},
+                             err)) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+
+    if (!detail_list_add_row(editor,
+                             pgettext("anm2editor", "Information"),
+                             ptk_anm2_get_information(editor->doc),
+                             &(struct detaillist_row_info){.type = detaillist_row_type_information},
+                             err)) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+
+    if (!detail_list_add_row(editor,
+                             pgettext("anm2editor", "PSD File Path"),
+                             ptk_anm2_get_psd_path(editor->doc),
+                             &(struct detaillist_row_info){.type = detaillist_row_type_psd_path},
+                             err)) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+
+    if (!detail_list_add_row(editor,
+                             pgettext("anm2editor", "Exclusive Support Default"),
+                             ptk_anm2_get_exclusive_support_default(editor->doc) ? "1" : "",
+                             &(struct detaillist_row_info){.type = detaillist_row_type_exclusive_support_default},
+                             err)) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+  }
+
+  success = true;
+
+cleanup:
+  return success;
 }
 
 // Populate detail panel for single item selection
-static void update_detail_panel_item(struct ptk_anm2editor *editor, size_t sel_idx, size_t item_idx) {
+static bool
+update_detail_panel_item(struct ptk_anm2editor *editor, size_t sel_idx, size_t item_idx, struct ov_error *const err) {
   if (sel_idx >= ptk_anm2_selector_count(editor->doc)) {
-    return;
+    return true;
   }
   if (item_idx >= ptk_anm2_item_count(editor->doc, sel_idx)) {
-    return;
+    return true;
   }
 
-  bool const is_animation = ptk_anm2_item_is_animation(editor->doc, sel_idx, item_idx);
-  if (is_animation) {
-    size_t const num_params = ptk_anm2_param_count(editor->doc, sel_idx, item_idx);
-    for (size_t i = 0; i < num_params; i++) {
-      char const *key = ptk_anm2_param_get_key(editor->doc, sel_idx, item_idx, i);
-      char const *value = ptk_anm2_param_get_value(editor->doc, sel_idx, item_idx, i);
-      detail_list_add_row(editor->detaillist, key, value, (LPARAM)i);
+  bool success = false;
+
+  {
+    bool const is_animation = ptk_anm2_item_is_animation(editor->doc, sel_idx, item_idx);
+    if (is_animation) {
+      size_t const num_params = ptk_anm2_param_count(editor->doc, sel_idx, item_idx);
+      for (size_t i = 0; i < num_params; i++) {
+        char const *key = ptk_anm2_param_get_key(editor->doc, sel_idx, item_idx, i);
+        char const *value = ptk_anm2_param_get_value(editor->doc, sel_idx, item_idx, i);
+        if (!detail_list_add_row(editor,
+                                 key,
+                                 value,
+                                 &(struct detaillist_row_info){
+                                     .type = detaillist_row_type_animation_param,
+                                     .param_index = i,
+                                 },
+                                 err)) {
+          OV_ERROR_ADD_TRACE(err);
+          goto cleanup;
+        }
+      }
+      if (!detail_list_add_row(editor,
+                               pgettext("anm2editor", "(Add new...)"),
+                               "",
+                               &(struct detaillist_row_info){.type = detaillist_row_type_placeholder},
+                               err)) {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+    } else {
+      char const *name = ptk_anm2_item_get_name(editor->doc, sel_idx, item_idx);
+      char const *value = ptk_anm2_item_get_value(editor->doc, sel_idx, item_idx);
+      if (!detail_list_add_row(
+              editor, name, value, &(struct detaillist_row_info){.type = detaillist_row_type_value_item}, err)) {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
     }
-    detail_list_add_row(editor->detaillist, pgettext("anm2editor", "(Add new...)"), "", DETAILLIST_LPARAM_PLACEHOLDER);
-  } else {
-    char const *name = ptk_anm2_item_get_name(editor->doc, sel_idx, item_idx);
-    char const *value = ptk_anm2_item_get_value(editor->doc, sel_idx, item_idx);
-    detail_list_add_row(editor->detaillist, name, value, (LPARAM)0);
   }
+
+  success = true;
+
+cleanup:
+  return success;
 }
 
 static void update_detail_panel(struct ptk_anm2editor *editor) {
@@ -1591,19 +1771,40 @@ static void update_detail_panel(struct ptk_anm2editor *editor) {
     return;
   }
 
+  struct ov_error err = {0};
+  bool success = false;
+
   SendMessageW(editor->detaillist, LVM_DELETEALLITEMS, 0, 0);
+  detaillist_rows_clear(editor);
 
   if (multisel_count(editor) > 1) {
-    update_detail_panel_multisel(editor);
+    if (!update_detail_panel_multisel(editor, &err)) {
+      OV_ERROR_ADD_TRACE(&err);
+      goto cleanup;
+    }
   } else {
     size_t sel_idx = 0;
     size_t item_idx = 0;
     int const sel_type = get_selected_indices(editor, &sel_idx, &item_idx);
     if (sel_type == 2) {
-      update_detail_panel_item(editor, sel_idx, item_idx);
+      if (!update_detail_panel_item(editor, sel_idx, item_idx, &err)) {
+        OV_ERROR_ADD_TRACE(&err);
+        goto cleanup;
+      }
     } else {
-      update_detail_panel_document(editor);
+      if (!update_detail_panel_document(editor, &err)) {
+        OV_ERROR_ADD_TRACE(&err);
+        goto cleanup;
+      }
     }
+  }
+
+  success = true;
+
+cleanup:
+  if (!success) {
+    ptk_logf_error(&err, "%1$hs", "%1$hs", gettext("failed to update detail panel."));
+    OV_ERROR_DESTROY(&err);
   }
 }
 
@@ -1626,42 +1827,126 @@ static void detail_list_update_row(HWND listview, int row_idx, char const *prope
 }
 
 // Helper to insert a row at a specific position in the detail list
-static void
-detail_list_insert_row_at(HWND listview, int row_idx, char const *property, char const *value, LPARAM lparam) {
+static bool detail_list_insert_row_at(struct ptk_anm2editor *editor,
+                                      int row_idx,
+                                      char const *property,
+                                      char const *value,
+                                      struct detaillist_row_info const *info,
+                                      struct ov_error *const err) {
+  // Insert metadata at the corresponding position
+  if (!detaillist_rows_insert_at(editor, (size_t)row_idx, info, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    return false;
+  }
+
   wchar_t prop_buf[256];
   wchar_t val_buf[512];
   ov_snprintf_char2wchar(prop_buf, sizeof(prop_buf) / sizeof(prop_buf[0]), "%1$hs", "%1$hs", property ? property : "");
   ov_snprintf_char2wchar(val_buf, sizeof(val_buf) / sizeof(val_buf[0]), "%1$hs", "%1$hs", value ? value : "");
 
-  LVITEMW lvi = {
-      .mask = LVIF_TEXT | LVIF_PARAM,
-      .iItem = row_idx,
-      .iSubItem = 0,
-      .pszText = prop_buf,
-      .lParam = lparam,
-  };
-  SendMessageW(listview, LVM_INSERTITEMW, 0, (LPARAM)&lvi);
-  lvi.iSubItem = 1;
-  lvi.pszText = val_buf;
-  SendMessageW(listview, LVM_SETITEMTEXTW, (WPARAM)row_idx, (LPARAM)&lvi);
+  SendMessageW(editor->detaillist,
+               LVM_INSERTITEMW,
+               0,
+               (LPARAM) & (LVITEMW){
+                              .mask = LVIF_TEXT | LVIF_PARAM,
+                              .iItem = row_idx,
+                              .iSubItem = 0,
+                              .pszText = prop_buf,
+                              .lParam = (LPARAM)(size_t)row_idx,
+                          });
+  SendMessageW(editor->detaillist,
+               LVM_SETITEMTEXTW,
+               (WPARAM)row_idx,
+               (LPARAM) & (LVITEMW){
+                              .iSubItem = 1,
+                              .pszText = val_buf,
+                          });
+
+  // Update lParam for all rows after the inserted one (their indices shifted by 1)
+  int const count = (int)SendMessageW(editor->detaillist, LVM_GETITEMCOUNT, 0, 0);
+  for (int i = row_idx + 1; i < count; i++) {
+    SendMessageW(editor->detaillist,
+                 LVM_SETITEMW,
+                 0,
+                 (LPARAM) & (LVITEMW){
+                                .mask = LVIF_PARAM,
+                                .iItem = i,
+                                .lParam = (LPARAM)(size_t)i,
+                            });
+  }
+  return true;
 }
 
-// Find the ListView row index by lParam value
+// Remove a row from the detail list and update metadata
+static void detail_list_remove_row_at(struct ptk_anm2editor *editor, int row_idx) {
+  // Remove the ListView item
+  SendMessageW(editor->detaillist, LVM_DELETEITEM, (WPARAM)row_idx, 0);
+
+  // Remove the metadata
+  detaillist_rows_remove_at(editor, (size_t)row_idx);
+
+  // Update lParam for all rows after the removed one (their indices shifted by 1)
+  int const count = (int)SendMessageW(editor->detaillist, LVM_GETITEMCOUNT, 0, 0);
+  for (int i = row_idx; i < count; i++) {
+    SendMessageW(editor->detaillist,
+                 LVM_SETITEMW,
+                 0,
+                 (LPARAM) & (LVITEMW){
+                                .mask = LVIF_PARAM,
+                                .iItem = i,
+                                .lParam = (LPARAM)(size_t)i,
+                            });
+  }
+}
+
+// Find the ListView row index by row type
 // Returns -1 if not found
-static int detail_list_find_row_by_lparam(HWND listview, LPARAM target_lparam) {
-  int const count = (int)SendMessageW(listview, LVM_GETITEMCOUNT, 0, 0);
-  for (int i = 0; i < count; i++) {
-    LVITEMW lvi = {
-        .mask = LVIF_PARAM,
-        .iItem = i,
-    };
-    if (SendMessageW(listview, LVM_GETITEMW, 0, (LPARAM)&lvi)) {
-      if (lvi.lParam == target_lparam) {
-        return i;
+static int detail_list_find_row_by_type(struct ptk_anm2editor const *editor, enum detaillist_row_type type) {
+  size_t const idx = detaillist_rows_find_by_type(editor, type);
+  if (idx == SIZE_MAX) {
+    return -1;
+  }
+  return (int)idx;
+}
+
+// Helper function for handling param_insert operation in differential update
+// This function exists to properly use the goto cleanup pattern as required by ovbase coding standards.
+static bool handle_param_insert_differential(
+    struct ptk_anm2editor *editor, size_t sel_idx, size_t item_idx, size_t param_idx, struct ov_error *const err) {
+  if (!ptk_anm2_item_is_animation(editor->doc, sel_idx, item_idx)) {
+    return true;
+  }
+
+  bool success = false;
+
+  {
+    char const *key = ptk_anm2_param_get_key(editor->doc, sel_idx, item_idx, param_idx);
+    char const *value = ptk_anm2_param_get_value(editor->doc, sel_idx, item_idx, param_idx);
+    if (!detail_list_insert_row_at(editor,
+                                   (int)param_idx,
+                                   key,
+                                   value,
+                                   &(struct detaillist_row_info){
+                                       .type = detaillist_row_type_animation_param,
+                                       .param_index = param_idx,
+                                   },
+                                   err)) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+    // Update param_index in metadata for subsequent rows
+    size_t const row_count = OV_ARRAY_LENGTH(editor->detaillist_rows);
+    for (size_t i = param_idx + 1; i < row_count; i++) {
+      if (editor->detaillist_rows[i].type == detaillist_row_type_animation_param) {
+        editor->detaillist_rows[i].param_index = i;
       }
     }
   }
-  return -1;
+
+  success = true;
+
+cleanup:
+  return success;
 }
 
 // Update detail list based on document changes (differential updates)
@@ -1672,6 +1957,9 @@ static void update_detaillist_differential(
     return;
   }
 
+  struct ov_error err = {0};
+  bool success = false;
+
   // Get current selection
   size_t cur_sel_idx = 0;
   size_t cur_item_idx = 0;
@@ -1681,7 +1969,7 @@ static void update_detaillist_differential(
   case ptk_anm2_op_set_label:
     // Label row is shown when nothing or a selector is selected (sel_type == 0 or 1)
     if (sel_type == 0 || sel_type == 1) {
-      int const row_idx = detail_list_find_row_by_lparam(editor->detaillist, DETAILLIST_LPARAM_LABEL);
+      int const row_idx = detail_list_find_row_by_type(editor, detaillist_row_type_label);
       if (row_idx >= 0) {
         detail_list_update_row(
             editor->detaillist, row_idx, pgettext("anm2editor", "Label"), ptk_anm2_get_label(editor->doc));
@@ -1692,7 +1980,7 @@ static void update_detaillist_differential(
   case ptk_anm2_op_set_psd_path:
     // PSD Path row is shown when nothing or a selector is selected (sel_type == 0 or 1)
     if (sel_type == 0 || sel_type == 1) {
-      int const row_idx = detail_list_find_row_by_lparam(editor->detaillist, DETAILLIST_LPARAM_PSD_PATH);
+      int const row_idx = detail_list_find_row_by_type(editor, detaillist_row_type_psd_path);
       if (row_idx >= 0) {
         detail_list_update_row(
             editor->detaillist, row_idx, pgettext("anm2editor", "PSD File Path"), ptk_anm2_get_psd_path(editor->doc));
@@ -1725,26 +2013,9 @@ static void update_detaillist_differential(
   case ptk_anm2_op_param_insert:
     // If an animation item is selected and it's the changed item, insert a new row
     if (sel_type == 2 && cur_sel_idx == sel_idx && cur_item_idx == item_idx) {
-      if (ptk_anm2_item_is_animation(editor->doc, sel_idx, item_idx)) {
-        char const *key = ptk_anm2_param_get_key(editor->doc, sel_idx, item_idx, param_idx);
-        char const *value = ptk_anm2_param_get_value(editor->doc, sel_idx, item_idx, param_idx);
-        // Insert at param_idx position (before the placeholder row)
-        detail_list_insert_row_at(editor->detaillist, (int)param_idx, key, value, (LPARAM)param_idx);
-        // Update lParam values for subsequent rows (they shifted by 1)
-        int const count = (int)SendMessageW(editor->detaillist, LVM_GETITEMCOUNT, 0, 0);
-        for (int i = (int)param_idx + 1; i < count; i++) {
-          LVITEMW lvi = {
-              .mask = LVIF_PARAM,
-              .iItem = i,
-          };
-          if (SendMessageW(editor->detaillist, LVM_GETITEMW, 0, (LPARAM)&lvi)) {
-            // Skip special lParams (negative values)
-            if (lvi.lParam >= 0) {
-              lvi.lParam = (LPARAM)i;
-              SendMessageW(editor->detaillist, LVM_SETITEMW, 0, (LPARAM)&lvi);
-            }
-          }
-        }
+      if (!handle_param_insert_differential(editor, sel_idx, item_idx, param_idx, &err)) {
+        OV_ERROR_ADD_TRACE(&err);
+        goto cleanup;
       }
     }
     break;
@@ -1753,21 +2024,12 @@ static void update_detaillist_differential(
     // If an animation item is selected and it's the changed item, remove the row
     // Note: param_idx refers to the index BEFORE removal (doc already has it removed)
     if (sel_type == 2 && cur_sel_idx == sel_idx && cur_item_idx == item_idx) {
-      // Delete the row at param_idx
-      SendMessageW(editor->detaillist, LVM_DELETEITEM, (WPARAM)param_idx, 0);
-      // Update lParam values for subsequent rows (they shifted by 1)
-      int const count = (int)SendMessageW(editor->detaillist, LVM_GETITEMCOUNT, 0, 0);
-      for (int i = (int)param_idx; i < count; i++) {
-        LVITEMW lvi = {
-            .mask = LVIF_PARAM,
-            .iItem = i,
-        };
-        if (SendMessageW(editor->detaillist, LVM_GETITEMW, 0, (LPARAM)&lvi)) {
-          // Skip special lParams (negative values)
-          if (lvi.lParam >= 0) {
-            lvi.lParam = (LPARAM)i;
-            SendMessageW(editor->detaillist, LVM_SETITEMW, 0, (LPARAM)&lvi);
-          }
+      detail_list_remove_row_at(editor, (int)param_idx);
+      // Update param_index in metadata for subsequent rows
+      size_t const row_count = OV_ARRAY_LENGTH(editor->detaillist_rows);
+      for (size_t i = param_idx; i < row_count; i++) {
+        if (editor->detaillist_rows[i].type == detaillist_row_type_animation_param) {
+          editor->detaillist_rows[i].param_index = i;
         }
       }
     }
@@ -1825,7 +2087,7 @@ static void update_detaillist_differential(
 
   case ptk_anm2_op_set_exclusive_support_default: {
     // Update Exclusive Support Default row if visible (sel_type == 0 or 1)
-    int const row_idx = detail_list_find_row_by_lparam(editor->detaillist, DETAILLIST_LPARAM_EXCLUSIVE_SUPPORT_DEFAULT);
+    int const row_idx = detail_list_find_row_by_type(editor, detaillist_row_type_exclusive_support_default);
     if (row_idx >= 0) {
       detail_list_update_row(editor->detaillist,
                              row_idx,
@@ -1837,13 +2099,21 @@ static void update_detaillist_differential(
 
   case ptk_anm2_op_set_information: {
     // Update Information row if visible (sel_type == 0 or 1)
-    int const row_idx = detail_list_find_row_by_lparam(editor->detaillist, DETAILLIST_LPARAM_INFORMATION);
+    int const row_idx = detail_list_find_row_by_type(editor, detaillist_row_type_information);
     if (row_idx >= 0) {
       detail_list_update_row(
           editor->detaillist, row_idx, pgettext("anm2editor", "Information"), ptk_anm2_get_information(editor->doc));
     }
     break;
   }
+  }
+
+  success = true;
+
+cleanup:
+  if (!success) {
+    ptk_logf_error(&err, "%1$hs", "%1$hs", gettext("failed to update detail list differentially."));
+    OV_ERROR_DESTROY(&err);
   }
 }
 
@@ -2237,7 +2507,7 @@ static void cancel_inline_edit(struct ptk_anm2editor *editor) {
   editor->edit_control = NULL;
   editor->edit_row = -1;
   editor->edit_column = -1;
-  editor->edit_lparam = 0;
+  editor->edit_row_index = 0;
   editor->edit_oldproc = NULL;
   editor->edit_adding_new = false;
 
@@ -2294,11 +2564,19 @@ static void commit_inline_edit(struct ptk_anm2editor *editor) {
     OV_ARRAY_SET_LENGTH(new_value_utf8, utf8_written);
   }
 
-  // Handle special rows (Label, PSD Path, Exclusive Support Default, Information)
+  // Get row metadata to determine what we're editing
   {
+    struct detaillist_row_info const *row_info = detaillist_rows_get(editor, editor->edit_row_index);
+    if (!row_info) {
+      // Invalid row index - should not happen
+      success = true;
+      goto cleanup;
+    }
+
     char const *value = new_value_utf8 ? new_value_utf8 : "";
 
-    if (detaillist_is_label_row(editor->edit_lparam)) {
+    switch (row_info->type) {
+    case detaillist_row_type_label: {
       // Editing Label row - skip if unchanged
       char const *current = ptk_anm2_get_label(editor->doc);
       if (strcmp(value, current ? current : "") == 0) {
@@ -2314,7 +2592,7 @@ static void commit_inline_edit(struct ptk_anm2editor *editor) {
       goto cleanup;
     }
 
-    if (detaillist_is_psd_path_row(editor->edit_lparam)) {
+    case detaillist_row_type_psd_path: {
       // Editing PSD Path row - skip if unchanged
       char const *current = ptk_anm2_get_psd_path(editor->doc);
       if (strcmp(value, current ? current : "") == 0) {
@@ -2330,16 +2608,16 @@ static void commit_inline_edit(struct ptk_anm2editor *editor) {
       goto cleanup;
     }
 
-    if (detaillist_is_exclusive_support_default_row(editor->edit_lparam)) {
+    case detaillist_row_type_exclusive_support_default: {
       // Editing Exclusive Support Default row
       // "0" or empty = false, anything else = true
-      bool new_value = (value[0] != '\0' && value[0] != '0');
+      bool new_value_bool = (value[0] != '\0' && value[0] != '0');
       // Skip if unchanged
-      if (new_value == ptk_anm2_get_exclusive_support_default(editor->doc)) {
+      if (new_value_bool == ptk_anm2_get_exclusive_support_default(editor->doc)) {
         success = true;
         goto cleanup;
       }
-      if (!ptk_anm2_set_exclusive_support_default(editor->doc, new_value, &err)) {
+      if (!ptk_anm2_set_exclusive_support_default(editor->doc, new_value_bool, &err)) {
         OV_ERROR_ADD_TRACE(&err);
         goto cleanup;
       }
@@ -2348,7 +2626,7 @@ static void commit_inline_edit(struct ptk_anm2editor *editor) {
       goto cleanup;
     }
 
-    if (detaillist_is_information_row(editor->edit_lparam)) {
+    case detaillist_row_type_information: {
       // Editing Information row
       // Empty string means auto-generate (NULL)
       char const *info_value = (value[0] == '\0') ? NULL : value;
@@ -2367,18 +2645,88 @@ static void commit_inline_edit(struct ptk_anm2editor *editor) {
       success = true;
       goto cleanup;
     }
-  }
 
-  // Multi-selection mode: lParam contains item ID
-  // Note: We must also check multisel_count to avoid false positives with animation item parameters,
-  // which use positive integers (param index) as lParam that could match detaillist_is_multisel_item.
-  if (multisel_count(editor) > 1 && detaillist_is_multisel_item(editor->edit_lparam)) {
-    uint32_t const item_id = (uint32_t)editor->edit_lparam;
-    size_t sel_idx = 0;
-    size_t item_idx = 0;
-    if (ptk_anm2_find_item_by_id(editor->doc, item_id, &sel_idx, &item_idx)) {
-      // Value items only in multi-selection mode (animation items are skipped)
-      char const *value = new_value_utf8 ? new_value_utf8 : "";
+    case detaillist_row_type_multisel_item: {
+      // Multi-selection mode: row_info contains item ID
+      uint32_t const item_id = row_info->item_id;
+      size_t sel_idx = 0;
+      size_t item_idx = 0;
+      if (ptk_anm2_find_item_by_id(editor->doc, item_id, &sel_idx, &item_idx)) {
+        // Value items only in multi-selection mode (animation items are skipped)
+        if (editor->edit_column == 0) {
+          // Editing Name column
+          char const *current = ptk_anm2_item_get_name(editor->doc, sel_idx, item_idx);
+          if (strcmp(value, current ? current : "") != 0) {
+            if (!ptk_anm2_item_set_name(editor->doc, sel_idx, item_idx, value, &err)) {
+              OV_ERROR_ADD_TRACE(&err);
+              goto cleanup;
+            }
+            mark_modified(editor);
+          }
+        } else {
+          // Editing Value column
+          char const *current = ptk_anm2_item_get_value(editor->doc, sel_idx, item_idx);
+          if (strcmp(value, current ? current : "") != 0) {
+            if (!ptk_anm2_item_set_value(editor->doc, sel_idx, item_idx, value, &err)) {
+              OV_ERROR_ADD_TRACE(&err);
+              goto cleanup;
+            }
+            mark_modified(editor);
+          }
+        }
+      }
+      success = true;
+      goto cleanup;
+    }
+
+    case detaillist_row_type_animation_param: {
+      // Animation item parameter
+      size_t sel_idx = 0;
+      size_t item_idx = 0;
+      int const sel_type = get_selected_indices(editor, &sel_idx, &item_idx);
+      if (sel_type != 2) {
+        success = true;
+        goto cleanup;
+      }
+      size_t const param_idx = row_info->param_index;
+      if (param_idx >= ptk_anm2_param_count(editor->doc, sel_idx, item_idx)) {
+        success = true;
+        goto cleanup;
+      }
+      if (editor->edit_column == 0) {
+        // Editing key column
+        char const *current = ptk_anm2_param_get_key(editor->doc, sel_idx, item_idx, param_idx);
+        if (strcmp(value, current ? current : "") != 0) {
+          if (!ptk_anm2_param_set_key(editor->doc, sel_idx, item_idx, param_idx, value, &err)) {
+            OV_ERROR_ADD_TRACE(&err);
+            goto cleanup;
+          }
+          mark_modified(editor);
+        }
+      } else {
+        // Editing value column
+        char const *current = ptk_anm2_param_get_value(editor->doc, sel_idx, item_idx, param_idx);
+        if (strcmp(value, current ? current : "") != 0) {
+          if (!ptk_anm2_param_set_value(editor->doc, sel_idx, item_idx, param_idx, value, &err)) {
+            OV_ERROR_ADD_TRACE(&err);
+            goto cleanup;
+          }
+          mark_modified(editor);
+        }
+      }
+      success = true;
+      goto cleanup;
+    }
+
+    case detaillist_row_type_value_item: {
+      // Value item (single selection)
+      size_t sel_idx = 0;
+      size_t item_idx = 0;
+      int const sel_type = get_selected_indices(editor, &sel_idx, &item_idx);
+      if (sel_type != 2) {
+        success = true;
+        goto cleanup;
+      }
       if (editor->edit_column == 0) {
         // Editing Name column
         char const *current = ptk_anm2_item_get_name(editor->doc, sel_idx, item_idx);
@@ -2388,6 +2736,8 @@ static void commit_inline_edit(struct ptk_anm2editor *editor) {
             goto cleanup;
           }
           mark_modified(editor);
+          // Update TreeView to reflect new name
+          update_selected_treeview_text(editor);
         }
       } else {
         // Editing Value column
@@ -2400,95 +2750,29 @@ static void commit_inline_edit(struct ptk_anm2editor *editor) {
           mark_modified(editor);
         }
       }
+      success = true;
+      goto cleanup;
     }
-    success = true;
-    goto cleanup;
-  }
 
-  // Get currently selected item to update
-  {
-    size_t sel_idx = 0;
-    size_t item_idx = 0;
-    int const sel_type = get_selected_indices(editor, &sel_idx, &item_idx);
-
-    if (sel_type == 2 && sel_idx < ptk_anm2_selector_count(editor->doc)) {
-      if (item_idx < ptk_anm2_item_count(editor->doc, sel_idx)) {
-        bool const is_animation = ptk_anm2_item_is_animation(editor->doc, sel_idx, item_idx);
-        char const *value = new_value_utf8 ? new_value_utf8 : "";
-
-        if (editor->edit_adding_new) {
-          // Adding new parameter - only add if key is not empty
-          if (is_animation && value[0] != '\0') {
-            if (!ptk_anm2_param_add(editor->doc, sel_idx, item_idx, value, "", &err)) {
-              OV_ERROR_ADD_TRACE(&err);
-              goto cleanup;
-            }
-            mark_modified(editor);
-            update_detail_panel(editor);
+    case detaillist_row_type_placeholder: {
+      // Adding new parameter
+      if (editor->edit_adding_new && value[0] != '\0') {
+        size_t sel_idx = 0;
+        size_t item_idx = 0;
+        int const sel_type = get_selected_indices(editor, &sel_idx, &item_idx);
+        if (sel_type == 2 && ptk_anm2_item_is_animation(editor->doc, sel_idx, item_idx)) {
+          if (!ptk_anm2_param_add(editor->doc, sel_idx, item_idx, value, "", &err)) {
+            OV_ERROR_ADD_TRACE(&err);
+            goto cleanup;
           }
-          // If empty, just cancel (do nothing)
-        } else if (editor->edit_column == 0) {
-          // Editing Name column
-          if (is_animation) {
-            // Animation item - update parameter key
-            if ((size_t)editor->edit_row < ptk_anm2_param_count(editor->doc, sel_idx, item_idx)) {
-              // Skip if unchanged
-              char const *current = ptk_anm2_param_get_key(editor->doc, sel_idx, item_idx, (size_t)editor->edit_row);
-              if (strcmp(value, current ? current : "") != 0) {
-                if (!ptk_anm2_param_set_key(editor->doc, sel_idx, item_idx, (size_t)editor->edit_row, value, &err)) {
-                  OV_ERROR_ADD_TRACE(&err);
-                  goto cleanup;
-                }
-                mark_modified(editor);
-              }
-            }
-          } else {
-            // Value item - update item name
-            if (editor->edit_row == 0) {
-              // Skip if unchanged
-              char const *current = ptk_anm2_item_get_name(editor->doc, sel_idx, item_idx);
-              if (strcmp(value, current ? current : "") != 0) {
-                if (!ptk_anm2_item_set_name(editor->doc, sel_idx, item_idx, value, &err)) {
-                  OV_ERROR_ADD_TRACE(&err);
-                  goto cleanup;
-                }
-                mark_modified(editor);
-                // Update TreeView to reflect new name
-                update_selected_treeview_text(editor);
-              }
-            }
-          }
-        } else {
-          // Editing Value column (column == 1)
-          if (is_animation) {
-            // Animation item - update parameter value at edit_row
-            if ((size_t)editor->edit_row < ptk_anm2_param_count(editor->doc, sel_idx, item_idx)) {
-              // Skip if unchanged
-              char const *current = ptk_anm2_param_get_value(editor->doc, sel_idx, item_idx, (size_t)editor->edit_row);
-              if (strcmp(value, current ? current : "") != 0) {
-                if (!ptk_anm2_param_set_value(editor->doc, sel_idx, item_idx, (size_t)editor->edit_row, value, &err)) {
-                  OV_ERROR_ADD_TRACE(&err);
-                  goto cleanup;
-                }
-                mark_modified(editor);
-              }
-            }
-          } else {
-            // Value item - update value (only one row, so edit_row should be 0)
-            if (editor->edit_row == 0) {
-              // Skip if unchanged
-              char const *current = ptk_anm2_item_get_value(editor->doc, sel_idx, item_idx);
-              if (strcmp(value, current ? current : "") != 0) {
-                if (!ptk_anm2_item_set_value(editor->doc, sel_idx, item_idx, value, &err)) {
-                  OV_ERROR_ADD_TRACE(&err);
-                  goto cleanup;
-                }
-                mark_modified(editor);
-              }
-            }
-          }
+          mark_modified(editor);
+          update_detail_panel(editor);
         }
       }
+      // If empty, just cancel (do nothing)
+      success = true;
+      goto cleanup;
+    }
     }
   }
 
@@ -2516,7 +2800,7 @@ cleanup:
     editor->edit_control = NULL;
     editor->edit_row = -1;
     editor->edit_column = -1;
-    editor->edit_lparam = 0;
+    editor->edit_row_index = 0;
     editor->edit_oldproc = NULL;
     editor->edit_adding_new = false;
 
@@ -2566,45 +2850,39 @@ static void start_inline_edit(struct ptk_anm2editor *editor, int row, int column
     return;
   }
 
-  // Get lParam to check if this row is editable
+  // Get lParam (which is the index into detaillist_rows)
   LVITEMW check_lvi = {
       .mask = LVIF_PARAM,
       .iItem = row,
   };
   SendMessageW(editor->detaillist, LVM_GETITEMW, 0, (LPARAM)&check_lvi);
+  size_t const row_index = (size_t)check_lvi.lParam;
 
-  // Check if this is a special editable row (Label, PSD Path, Exclusive Support Default, Information)
-  bool const is_label_row = detaillist_is_label_row(check_lvi.lParam);
-  bool const is_psd_path_row = detaillist_is_psd_path_row(check_lvi.lParam);
-  bool const is_exclusive_support_default_row = detaillist_is_exclusive_support_default_row(check_lvi.lParam);
-  bool const is_information_row = detaillist_is_information_row(check_lvi.lParam);
+  // Get row metadata
+  struct detaillist_row_info const *row_info = detaillist_rows_get(editor, row_index);
+  if (!row_info) {
+    return;
+  }
 
-  if (is_label_row || is_psd_path_row || is_exclusive_support_default_row || is_information_row) {
+  // Check if this row type is editable and determine column restrictions
+  switch (row_info->type) {
+  case detaillist_row_type_label:
+  case detaillist_row_type_psd_path:
+  case detaillist_row_type_exclusive_support_default:
+  case detaillist_row_type_information:
     // These rows can only edit the Value column (column 1)
     if (column != 1) {
       return;
     }
-  } else {
-    // Placeholder and NOT_EDITABLE rows cannot be edited inline
-    if (!detaillist_is_editable_param(check_lvi.lParam)) {
-      return;
-    }
-
-    // Check if editing is allowed for this cell based on item type
-    size_t sel_idx = 0;
-    size_t item_idx = 0;
-    int const sel_type = get_selected_indices(editor, &sel_idx, &item_idx);
-    if (sel_type != 2) {
-      return;
-    }
-    if (sel_idx >= ptk_anm2_selector_count(editor->doc)) {
-      return;
-    }
-    if (item_idx >= ptk_anm2_item_count(editor->doc, sel_idx)) {
-      return;
-    }
-    bool const is_animation = ptk_anm2_item_is_animation(editor->doc, sel_idx, item_idx);
-    (void)is_animation; // Both animation and value items are editable
+    break;
+  case detaillist_row_type_placeholder:
+    // Placeholder row cannot be edited inline (use start_inline_edit_for_new instead)
+    return;
+  case detaillist_row_type_multisel_item:
+  case detaillist_row_type_animation_param:
+  case detaillist_row_type_value_item:
+    // These are editable
+    break;
   }
 
   // Cancel any existing edit
@@ -2660,7 +2938,7 @@ static void start_inline_edit(struct ptk_anm2editor *editor, int row, int column
 
   editor->edit_row = row;
   editor->edit_column = column;
-  editor->edit_lparam = check_lvi.lParam;
+  editor->edit_row_index = row_index;
   editor->edit_adding_new = false;
 
   // Store editor pointer in edit control
@@ -2742,6 +3020,7 @@ static void start_inline_edit_for_new(struct ptk_anm2editor *editor) {
 
   editor->edit_row = placeholder_row;
   editor->edit_column = 0;
+  editor->edit_row_index = (size_t)placeholder_row; // Points to placeholder row info
   editor->edit_adding_new = true;
 
   // Store editor pointer in edit control
@@ -2970,38 +3249,43 @@ static bool delete_selected_parameter(struct ptk_anm2editor *editor, struct ov_e
     goto cleanup;
   }
 
-  // Get lParam to check if this row is deletable
+  // Get lParam (row index) to check if this row is deletable
   lvi.mask = LVIF_PARAM;
   lvi.iItem = selected_row;
   SendMessageW(editor->detaillist, LVM_GETITEMW, 0, (LPARAM)&lvi);
 
-  if (!detaillist_is_editable_param(lvi.lParam)) {
-    // Placeholder or NOT_EDITABLE rows cannot be deleted - not an error
-    success = true;
-    goto cleanup;
+  // Get row metadata
+  {
+    struct detaillist_row_info const *row_info = detaillist_rows_get(editor, (size_t)lvi.lParam);
+    if (!row_info || !detaillist_row_type_is_deletable_param(row_info->type)) {
+      // Not a deletable row - not an error
+      success = true;
+      goto cleanup;
+    }
+
+    sel_type = get_selected_indices(editor, &sel_idx, &item_idx);
+    if (sel_type != 2) {
+      // No item selected - not an error
+      success = true;
+      goto cleanup;
+    }
+    if (sel_idx >= ptk_anm2_selector_count(editor->doc)) {
+      success = true;
+      goto cleanup;
+    }
+    if (item_idx >= ptk_anm2_item_count(editor->doc, sel_idx)) {
+      success = true;
+      goto cleanup;
+    }
+    if (!ptk_anm2_item_is_animation(editor->doc, sel_idx, item_idx)) {
+      // Only Animation items have deletable parameters - not an error
+      success = true;
+      goto cleanup;
+    }
+
+    param_idx = row_info->param_index;
   }
 
-  sel_type = get_selected_indices(editor, &sel_idx, &item_idx);
-  if (sel_type != 2) {
-    // No item selected - not an error
-    success = true;
-    goto cleanup;
-  }
-  if (sel_idx >= ptk_anm2_selector_count(editor->doc)) {
-    success = true;
-    goto cleanup;
-  }
-  if (item_idx >= ptk_anm2_item_count(editor->doc, sel_idx)) {
-    success = true;
-    goto cleanup;
-  }
-  if (!ptk_anm2_item_is_animation(editor->doc, sel_idx, item_idx)) {
-    // Only Animation items have deletable parameters - not an error
-    success = true;
-    goto cleanup;
-  }
-
-  param_idx = detaillist_get_param_index(lvi.lParam);
   if (param_idx >= ptk_anm2_param_count(editor->doc, sel_idx, item_idx)) {
     success = true;
     goto cleanup;
@@ -4662,23 +4946,26 @@ static LRESULT CALLBACK anm2editor_wnd_proc(HWND hwnd, UINT message, WPARAM wpar
       int const sel_type = get_selected_indices(editor, &sel_idx, &item_idx);
 
       if (nmia->iItem >= 0) {
-        // Get lParam to check if this is a placeholder row
+        // Get lParam (row index) to check row type
         LVITEMW lvi = {
             .mask = LVIF_PARAM,
             .iItem = nmia->iItem,
         };
         SendMessageW(editor->detaillist, LVM_GETITEMW, 0, (LPARAM)&lvi);
 
-        if (detaillist_is_placeholder(lvi.lParam)) {
-          // Placeholder row - start editing for new parameter (don't add yet)
-          if (sel_type == 2) {
-            start_inline_edit_for_new(editor);
+        struct detaillist_row_info const *row_info = detaillist_rows_get(editor, (size_t)lvi.lParam);
+        if (row_info) {
+          if (row_info->type == detaillist_row_type_placeholder) {
+            // Placeholder row - start editing for new parameter (don't add yet)
+            if (sel_type == 2) {
+              start_inline_edit_for_new(editor);
+            }
+          } else if (detaillist_row_type_is_editable(row_info->type)) {
+            // Editable row (normal parameter, Label, or PSD Path) - start inline edit
+            start_inline_edit(editor, nmia->iItem, nmia->iSubItem);
           }
-        } else if (detaillist_is_editable(lvi.lParam)) {
-          // Editable row (normal parameter, Label, or PSD Path) - start inline edit
-          start_inline_edit(editor, nmia->iItem, nmia->iSubItem);
+          // Non-editable rows are ignored
         }
-        // NOT_EDITABLE rows are ignored
       } else {
         // Clicked on empty space - start editing for new parameter if Animation item is selected
         if (sel_type == 2 && ptk_anm2_item_is_animation(editor->doc, sel_idx, item_idx)) {
@@ -4722,7 +5009,8 @@ static LRESULT CALLBACK anm2editor_wnd_proc(HWND hwnd, UINT message, WPARAM wpar
         };
         SendMessageW(editor->detaillist, LVM_GETITEMW, 0, (LPARAM)&lvi);
 
-        if (detaillist_is_editable_param(lvi.lParam)) {
+        struct detaillist_row_info const *row_info = detaillist_rows_get(editor, (size_t)lvi.lParam);
+        if (row_info && detaillist_row_type_is_deletable_param(row_info->type)) {
           // Show context menu
           HMENU hMenu = CreatePopupMenu();
           if (hMenu) {
@@ -5176,6 +5464,10 @@ void ptk_anm2editor_destroy(struct ptk_anm2editor **editor_ptr) {
 
   if (editor->selected_item_ids) {
     OV_ARRAY_DESTROY(&editor->selected_item_ids);
+  }
+
+  if (editor->detaillist_rows) {
+    OV_ARRAY_DESTROY(&editor->detaillist_rows);
   }
 
   OV_FREE(editor_ptr);
