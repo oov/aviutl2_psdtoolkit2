@@ -2370,7 +2370,9 @@ static void commit_inline_edit(struct ptk_anm2editor *editor) {
   }
 
   // Multi-selection mode: lParam contains item ID
-  if (detaillist_is_multisel_item(editor->edit_lparam)) {
+  // Note: We must also check multisel_count to avoid false positives with animation item parameters,
+  // which use positive integers (param index) as lParam that could match detaillist_is_multisel_item.
+  if (multisel_count(editor) > 1 && detaillist_is_multisel_item(editor->edit_lparam)) {
     uint32_t const item_id = (uint32_t)editor->edit_lparam;
     size_t sel_idx = 0;
     size_t item_idx = 0;
