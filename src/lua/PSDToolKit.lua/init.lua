@@ -70,7 +70,7 @@ function M.psdcall(fn)
 			i18n({
 				ja_JP = "「最初に置くやつ@PSDToolKit」を配置してください",
 				en_US = 'Please place "最初に置くやつ@PSDToolKit" first',
-				zh_CN = "请先放置「最初に置くやつ@PSDToolKit」",
+				zh_CN = "请先放置“初始放置项@PSDToolKit”",
 			})
 		)
 		return
