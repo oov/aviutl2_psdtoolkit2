@@ -28,7 +28,11 @@ msgstr "%1$hs 选择器"
 
 msgctxt "anm2editor"
 msgid "(Add new...)"
-msgstr "(新增……)"
+msgstr "(新增...)"
+
+msgctxt ".ptk.anm2 Unselected item name for selector"
+msgid "(None)"
+msgstr "(未选择)"
 
 msgctxt "anm2editor"
 msgid "(Unnamed Item)"
@@ -114,7 +118,7 @@ msgstr "取消"
 
 msgctxt "gui"
 msgid "Capture"
-msgstr "接受"
+msgstr "接收"
 
 msgctxt "anm2editor"
 msgid "Conversion completed."
@@ -211,10 +215,6 @@ msgctxt "layerview"
 msgid "Favorites"
 msgstr "收藏夹"
 
-#, c-format
-msgid "GCMZDrops requires AviUtl ExEdit2 %1$s or later."
-msgstr ""
-
 msgid "GCMZDrops version is too old. PSDToolKit requires GCMZDrops %1$hs or later."
 msgstr "GCMZDrops 版本过旧。PSDToolKit 需要 GCMZDrops %1$hs 或更高版本。"
 
@@ -273,6 +273,10 @@ msgctxt "config"
 msgid "OK"
 msgstr "确定"
 
+msgctxt "config"
+msgid "Only create PSD file object when dropping *.&psd/*.psb file while holding Shift key"
+msgstr "仅在按住Shift键拖放时才创建PSD文件物件。"
+
 msgctxt "anm2editor"
 msgid "Open"
 msgstr "打开"
@@ -283,6 +287,10 @@ msgstr "操作失败。"
 msgctxt ".ptk.anm2 label"
 msgid "PSD"
 msgstr "PSD"
+
+msgctxt "config"
+msgid "PSD File Drop"
+msgstr "PSD文件路径"
 
 msgctxt "anm2editor"
 msgid "PSD File Path"
@@ -318,6 +326,10 @@ msgstr "PSDToolKit anm2 编辑器"
 msgid "PSDToolKit anm2 Editor is not open."
 msgstr "PSDToolKit anm2 编辑器未打开。"
 
+#, c-format
+msgid "PSDToolKit requires AviUtl ExEdit2 %1$s or later."
+msgstr "PSDToolKit 需要 AviUtl ExEdit2 %1$s 或更高版本。"
+
 msgctxt "anm2editor"
 msgid "Property"
 msgstr "属性"
@@ -336,7 +348,7 @@ msgstr "反转项目排序"
 
 msgctxt "anm2editor"
 msgid "Save"
-msgstr "保存"
+msgstr "覆盖保存"
 
 msgctxt "anm2editor"
 msgid "Save As"
@@ -492,6 +504,9 @@ msgstr "PSD文件添加失败。"
 msgid "failed to draw PSD image."
 msgstr "PSD图像渲染失败。"
 
+msgid "failed to end transaction in error recovery."
+msgstr "无法在错误恢复期间中终止事务。"
+
 msgid "failed to get %1$hs on %2$hs."
 msgstr "%2$hs 上的 %1$hs 获取失败。"
 
@@ -508,14 +523,13 @@ msgid "failed to get preferred languages."
 msgstr "首选语言设置获取失败。"
 
 msgid "failed to get required functions from GCMZDrops.aux2 plug-in."
-msgstr ""
+msgstr "GCMZDrops.aux2 插件必要函数获取失败。"
 
-#, fuzzy
 msgid "failed to initialize plugin."
 msgstr "插件初始化失败。"
 
 msgid "failed to load GCMZDrops.aux2 plug-in."
-msgstr ""
+msgstr "GCMZDrops.aux2 插件读取失败"
 
 msgid "failed to load config, continuing with default settings."
 msgstr "配置读取失败，将使用默认设置继续。"
@@ -526,7 +540,6 @@ msgstr "语言资源加载失败。强制继续。"
 msgid "failed to read text file."
 msgstr "文本文件读取失败。"
 
-#, fuzzy
 msgid "failed to register plugin."
 msgstr "设置保存失败。"
 
