@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.0.0alpha5 2026-01-12
 
 - AviUtl ExEdit2 version 2.0beta28 以降が必要です
 - PSDファイルの描画速度を少しだけ改善
