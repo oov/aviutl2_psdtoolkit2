@@ -202,13 +202,16 @@ func drawTextMiddle(canvas *nk.CommandBuffer, rect nk.Rect, s string, font *nk.U
 }
 
 func (lv *LayerView) layerTreeItem(ctx *nk.Context, indent, thumbSize float32, thumb *nk.Image, visible, forceVisible bool, l *composite.Layer) (clicked int, ctrl bool) {
-	const (
-		visibleSize      = 24
-		collapseSize     = 24
-		clippingSize     = 16
-		marginSize       = 8
-		thumbTextSpacing = 6
-	)
+	scale := lv.scale
+	if scale <= 0 {
+		scale = 1
+	}
+	visibleSize := float32(24) * scale
+	collapseSize := float32(24) * scale
+	marginSize := float32(8) * scale
+	thumbTextSpacing := float32(6) * scale
+	gap := float32(1) * scale
+
 	bounds := nk.NkLayoutSpaceBounds(ctx)
 
 	if l.Folder {
@@ -230,10 +233,10 @@ func (lv *LayerView) layerTreeItem(ctx *nk.Context, indent, thumbSize float32, t
 		nk.NkStylePopStyleItem(ctx)
 		nk.NkStylePopFont(ctx)
 	}
-	indent += collapseSize + 1
+	indent += collapseSize + gap
 
 	layerName := strings.ReplaceAll(l.Name, "\x00", "")
-	w := float32(nkhelper.TextWidth(lv.mainFontHandle, layerName) + marginSize*2 + visibleSize + thumbSize + thumbTextSpacing)
+	w := nkhelper.TextWidth(lv.mainFontHandle, layerName) + marginSize*2 + visibleSize + thumbSize + thumbTextSpacing
 	if l.Clipping {
 		w += visibleSize
 	}
@@ -303,9 +306,7 @@ func (lv *LayerView) layerTreeItem(ctx *nk.Context, indent, thumbSize float32, t
 
 func (lv *LayerView) layoutLayer(ctx *nk.Context, image *img.Image, indent float32, l *composite.Layer, visible bool) bool {
 	modified := false
-	const (
-		indentSize = 16
-	)
+	indentSize := float32(16) * lv.scale
 
 	visible = visible && l.Visible
 	if l.Clipping && l.ClippedBy != nil {
@@ -345,12 +346,15 @@ func (lv *LayerView) layoutLayer(ctx *nk.Context, image *img.Image, indent float
 
 func (lv *LayerView) layoutFavoriteItem(ctx *nk.Context, indent float32, n *img.Node) bool {
 	modified := false
-	const (
-		visibleSize  = 24
-		collapseSize = 24
-		clippingSize = 16
-		marginSize   = 8
-	)
+	scale := lv.scale
+	if scale <= 0 {
+		scale = 1
+	}
+	visibleSize := float32(24) * scale
+	collapseSize := float32(24) * scale
+	marginSize := float32(8) * scale
+	gap := float32(1) * scale
+
 	bounds := nk.NkLayoutSpaceBounds(ctx)
 
 	if n.Folder() || n.Filter() {
@@ -372,10 +376,10 @@ func (lv *LayerView) layoutFavoriteItem(ctx *nk.Context, indent float32, n *img.
 		nk.NkStylePopStyleItem(ctx)
 		nk.NkStylePopFont(ctx)
 	}
-	indent += collapseSize + 1
+	indent += collapseSize + gap
 
 	favName := strings.ReplaceAll(n.Name, "\x00", "")
-	w := float32(nkhelper.TextWidth(lv.mainFontHandle, favName) + marginSize*2)
+	w := nkhelper.TextWidth(lv.mainFontHandle, favName) + marginSize*2
 	if n.Filter() || n.Item() {
 		w += visibleSize
 	}
@@ -415,10 +419,8 @@ func (lv *LayerView) layoutFavoriteItem(ctx *nk.Context, indent float32, n *img.
 
 func (lv *LayerView) layoutFavorites(ctx *nk.Context, img *img.Image, indent float32, n *img.Node) bool {
 	modified := false
-	const (
-		indentSize = 16
-	)
-	nk.NkLayoutSpaceBegin(ctx, nk.Static, 28, 4)
+	indentSize := float32(16) * lv.scale
+	nk.NkLayoutSpaceBegin(ctx, nk.Static, float32(28)*lv.scale, 4)
 	if lv.layoutFavoriteItem(ctx, indent, n) {
 		modified = lv.selectFavoriteNode(img, n) || modified
 	}
@@ -434,12 +436,15 @@ func (lv *LayerView) layoutFavorites(ctx *nk.Context, img *img.Image, indent flo
 
 func (lv *LayerView) layoutFaview(ctx *nk.Context, img *img.Image, indent float32, n *img.FaviewNode) bool {
 	modified := false
-	const (
-		buttonSize = 32
-		marginSize = 8
-		indentSize = 16
-	)
-	nk.NkLayoutSpaceBegin(ctx, nk.Static, 28, 1)
+	scale := lv.scale
+	if scale <= 0 {
+		scale = 1
+	}
+	buttonSize := float32(32) * scale
+	marginSize := float32(8) * scale
+	indentSize := float32(16) * scale
+	comboItemHeight := int32(float32(28)*scale + 0.5)
+	nk.NkLayoutSpaceBegin(ctx, nk.Static, float32(28)*scale, 1)
 	bounds := nk.NkLayoutSpaceBounds(ctx)
 
 	left := indent
@@ -450,7 +455,7 @@ func (lv *LayerView) layoutFaview(ctx *nk.Context, img *img.Image, indent float3
 	nk.NkLayoutSpaceEnd(ctx)
 
 	if len(n.Items) > 0 {
-		nk.NkLayoutSpaceBegin(ctx, nk.Static, 28, 4)
+		nk.NkLayoutSpaceBegin(ctx, nk.Static, float32(28)*scale, 4)
 		bounds := nk.NkLayoutSpaceBounds(ctx)
 
 		left = indent + marginSize
@@ -472,7 +477,7 @@ func (lv *LayerView) layoutFaview(ctx *nk.Context, img *img.Image, indent float3
 		nk.NkStylePopFont(ctx)
 
 		nk.NkLayoutSpacePush(ctx, nk.NkRect(left, 0, bounds.W()-left-buttonSize*2-marginSize, bounds.H()))
-		if idx := int(nk.NkComboString(ctx, n.ItemNameList, int32(n.SelectedIndex), int32(len(n.Items)), 28, nk.NkVec2(bounds.W(), 400))); idx != n.SelectedIndex {
+		if idx := int(nk.NkComboString(ctx, n.ItemNameList, int32(n.SelectedIndex), int32(len(n.Items)), comboItemHeight, nk.NkVec2(bounds.W(), float32(400)*scale))); idx != n.SelectedIndex {
 			modified = lv.selectFaviewNode(img, n, idx) || modified
 		}
 		left += bounds.W() - left - buttonSize*2 - marginSize
