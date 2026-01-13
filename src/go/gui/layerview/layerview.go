@@ -37,6 +37,8 @@ type LayerView struct {
 	mainFontHandle   *nk.UserFont
 	symbolFontHandle *nk.UserFont
 
+	scale float32
+
 	thumbnailSize int
 	thumbnail     *nkhelper.Texture
 	thumbnailChip map[int]*nk.Image
@@ -50,10 +52,23 @@ type LayerView struct {
 
 var jq = jobqueue.New(1)
 
+func (lv *LayerView) SetFontHandles(mainFontHandle, symbolFontHandle *nk.UserFont) {
+	lv.mainFontHandle = mainFontHandle
+	lv.symbolFontHandle = symbolFontHandle
+}
+
+func (lv *LayerView) SetScale(scale float32) {
+	if scale <= 0 {
+		scale = 1
+	}
+	lv.scale = scale
+}
+
 func New(mainFontHandle, symbolFontHandle *nk.UserFont) (*LayerView, error) {
 	lv := &LayerView{
 		mainFontHandle:   mainFontHandle,
 		symbolFontHandle: symbolFontHandle,
+		scale:            1,
 
 		thumbnailChip: map[int]*nk.Image{},
 	}
@@ -113,10 +128,14 @@ func (lv *LayerView) Render(ctx *nk.Context, img *img.Image) bool {
 		return false
 	}
 
-	const (
-		layerTabPaneHeight = 30
-		padding            = 2
-	)
+	scale := lv.scale
+	if scale <= 0 {
+		scale = 1
+	}
+	layerTabPaneHeight := float32(30) * scale
+	padding := float32(2) * scale
+	comboHeight := float32(28) * scale
+	comboItemHeight := int32(comboHeight + 0.5)
 
 	modified := false
 	rgn := nk.NkWindowGetContentRegion(ctx)
@@ -152,13 +171,13 @@ func (lv *LayerView) Render(ctx *nk.Context, img *img.Image) bool {
 			}
 		case 1:
 			if img.PFV != nil && len(img.PFV.FaviewRoot.Children) > 0 {
-				nk.NkLayoutRowDynamic(ctx, 28, 1)
+				nk.NkLayoutRowDynamic(ctx, comboHeight, 1)
 				img.PFV.FaviewRoot.SelectedIndex = int(nk.NkComboString(
 					ctx,
 					img.PFV.FaviewRoot.ItemNameList,
 					int32(img.PFV.FaviewRoot.SelectedIndex),
 					int32(len(img.PFV.FaviewRoot.Children)),
-					28,
+					comboItemHeight,
 					nk.NkVec2(rgn.W(), rgn.H()),
 				))
 				children := img.PFV.FaviewRoot.Children[img.PFV.FaviewRoot.SelectedIndex].Children
@@ -294,7 +313,7 @@ func (lv *LayerView) layoutLayer(ctx *nk.Context, image *img.Image, indent float
 	}
 	_, forceVisible := image.Layers.ForceVisible[img.SeqID(l.SeqID)]
 	thumb, _ := lv.thumbnailChip[l.SeqID]
-	nk.NkLayoutSpaceBegin(ctx, nk.Static, 28, 3)
+	nk.NkLayoutSpaceBegin(ctx, nk.Static, float32(28)*lv.scale, 3)
 	if clicked, ctrl := lv.layerTreeItem(ctx, indent, float32(lv.thumbnailSize), thumb, visible, forceVisible, l); clicked != 0 {
 		if clicked&1 == 1 {
 			if ctrl {

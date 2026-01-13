@@ -62,6 +62,9 @@ type GUI struct {
 		SymbolHandle *nk.UserFont
 	}
 
+	lastDPI    uint32
+	symbolFont []byte
+
 	SendEditingImageState func(path, state string) error
 	ExportFaviewSlider    func(path, sliderName string, names, values []string, selectedIndex int) error
 	ExportLayerNames      func(path string, names, values []string, selectedIndex int) error
@@ -140,7 +143,9 @@ func (g *GUI) Init(caption string, bgImg, symbolFont []byte) error {
 		g.DropFiles(filenames)
 	})
 
-	if err = g.initFont(symbolFont); err != nil {
+	g.symbolFont = symbolFont
+	g.lastDPI = g.window.DPI()
+	if err = g.initFont(symbolFont, g.window.Scale()); err != nil {
 		return errors.Wrap(err, "gui: failed to load a font")
 	}
 
@@ -227,6 +232,47 @@ func b2i(b bool) int32 {
 	return 0
 }
 
+func (g *GUI) uiScale() float32 {
+	if g.window == nil {
+		return 1
+	}
+	s := g.window.Scale()
+	if s <= 0 {
+		return 1
+	}
+	return s
+}
+
+func (g *GUI) scaledInt(base int) int {
+	v := int(float32(base)*g.uiScale() + 0.5)
+	if v < 1 {
+		v = 1
+	}
+	return v
+}
+
+func (g *GUI) updateFontIfDPIChanged() {
+	if g.window == nil {
+		return
+	}
+	dpi := g.window.DPI()
+	if dpi == 0 || dpi == g.lastDPI {
+		return
+	}
+	if err := g.initFont(g.symbolFont, g.window.Scale()); err != nil {
+		g.ReportError(errors.Wrap(err, "gui: failed to reload font after DPI change"))
+		return
+	}
+	g.lastDPI = dpi
+	if g.layerView != nil {
+		g.layerView.SetFontHandles(g.font.MainHandle, g.font.SymbolHandle)
+		g.layerView.SetScale(g.uiScale())
+		if g.img != nil {
+			g.layerView.UpdateLayerThumbnails(g.img.PSD, g.scaledInt(24), g.do)
+		}
+	}
+}
+
 func (g *GUI) changeSelectedImage() {
 	if g.snapshot.SelectedIndex < 0 || g.snapshot.SelectedIndex >= len(g.snapshot.Items) {
 		g.img = nil
@@ -243,21 +289,24 @@ func (g *GUI) changeSelectedImage() {
 
 	g.thumbnailer = g.editing.CreateThumbnailer(g.snapshot.SelectedIndex)
 	updateRenderedImage(g, g.img)
-	g.layerView.UpdateLayerThumbnails(g.img.PSD, 24, g.do)
+	g.layerView.SetScale(g.uiScale())
+	g.layerView.UpdateLayerThumbnails(g.img.PSD, g.scaledInt(24), g.do)
 }
 
 func (g *GUI) update() {
 	ctx := g.context
+	g.updateFontIfDPIChanged()
 	nk.NkPlatformNewFrame()
 	width, height := g.window.GetSize()
-
-	const (
-		sidePaneWidth    = 360
-		topPaneHeight    = 28
-		closeButtonWidth = 28
-		sideTabPaneWidth = 64
-		padding          = 2
-	)
+	scale := g.uiScale()
+	p := float32(2) * scale
+	sidePaneWidth := float32(360) * scale
+	topPaneHeight := float32(28) * scale
+	closeButtonWidth := float32(28) * scale
+	sideTabPaneWidth := float32(64) * scale
+	if g.layerView != nil {
+		g.layerView.SetScale(scale)
+	}
 
 	modified := false
 
@@ -265,9 +314,9 @@ func (g *GUI) update() {
 	nk.NkStylePushVec2(ctx, nkhelper.GetStyleWindowGroupPaddingPtr(ctx), nk.NkVec2(0, 0))
 
 	if nk.NkBegin(ctx, "MainWindow", nk.NkRect(0, 0, float32(width), float32(height)), nk.WindowNoScrollbar) != 0 {
-		nk.NkLayoutRowBegin(ctx, nk.Static, float32(height-padding), 2)
+		nk.NkLayoutRowBegin(ctx, nk.Static, float32(height)-p, 2)
 
-		nk.NkLayoutRowPush(ctx, float32(sidePaneWidth-padding))
+		nk.NkLayoutRowPush(ctx, sidePaneWidth-p)
 		if nk.NkGroupBegin(ctx, "UIPane", nk.WindowNoScrollbar) != 0 {
 			if g.img != nil {
 				rgn := nk.NkWindowGetContentRegion(ctx)
@@ -275,7 +324,7 @@ func (g *GUI) update() {
 				if nk.NkInputIsKeyDown(ctx.Input(), nk.KeyCopy) != 0 {
 					g.setClipboard()
 				}
-				nk.NkLayoutRowBegin(ctx, nk.Dynamic, float32(topPaneHeight-padding), 4)
+				nk.NkLayoutRowBegin(ctx, nk.Dynamic, topPaneHeight-p, 4)
 				nk.NkLayoutRowPush(ctx, 0.3)
 				if nk.NkButtonLabel(ctx, locale.Pgettext("gui", "Send")) != 0 || nkhelper.IsPressed(ctx, 19) { // 19 = ^S
 					g.sendEditingImage()
@@ -294,20 +343,20 @@ func (g *GUI) update() {
 				}
 				nk.NkLayoutRowEnd(ctx)
 
-				nk.NkLayoutRowBegin(ctx, nk.Static, float32(rgn.H()-padding), 3)
+				nk.NkLayoutRowBegin(ctx, nk.Static, rgn.H()-p, 3)
 
-				nk.NkLayoutRowPush(ctx, float32(sideTabPaneWidth-padding))
+				nk.NkLayoutRowPush(ctx, sideTabPaneWidth-p)
 				if nk.NkGroupBegin(ctx, "SideTabPane", nk.WindowNoScrollbar) != 0 {
 					thumbnails, _ := g.thumbCache.Update(g.snapshot.Items)
 					n0 := g.snapshot.SelectedIndex
-					n1 := g.tabView.Render(ctx, g.snapshot, thumbnails)
+					n1 := g.tabView.Render(ctx, g.snapshot, thumbnails, scale)
 					if n0 != n1 {
 						g.editing.Select(n1)
 					}
 					nk.NkGroupEnd(ctx)
 				}
 
-				nk.NkLayoutRowPush(ctx, float32(rgn.W()-sideTabPaneWidth-padding))
+				nk.NkLayoutRowPush(ctx, rgn.W()-sideTabPaneWidth-p)
 				if nk.NkGroupBegin(ctx, "LayerTreePane", nk.WindowNoScrollbar) != 0 {
 					modified = g.layerView.Render(ctx, g.img) || modified
 					if modified {
@@ -323,7 +372,7 @@ func (g *GUI) update() {
 			nk.NkGroupEnd(ctx)
 		}
 
-		nk.NkLayoutRowPush(ctx, float32(width-sidePaneWidth-padding))
+		nk.NkLayoutRowPush(ctx, float32(width)-sidePaneWidth-p)
 		if nk.NkGroupBegin(ctx, "MainPane", nk.WindowNoScrollbar) != 0 {
 			if g.img != nil {
 				rgn := nk.NkWindowGetContentRegion(ctx)
@@ -333,22 +382,22 @@ func (g *GUI) update() {
 					displayName = g.snapshot.Items[g.snapshot.SelectedIndex].DisplayName
 				}
 
-				nk.NkLayoutRowBegin(ctx, nk.Static, topPaneHeight-padding, 2)
-				nk.NkLayoutRowPush(ctx, float32(rgn.W()-closeButtonWidth-padding))
+				nk.NkLayoutRowBegin(ctx, nk.Static, topPaneHeight-p, 2)
+				nk.NkLayoutRowPush(ctx, rgn.W()-closeButtonWidth-p)
 				nk.NkLabel(ctx, displayName, nk.TextCentered)
 
-				nk.NkLayoutRowPush(ctx, float32(closeButtonWidth-padding))
+				nk.NkLayoutRowPush(ctx, closeButtonWidth-p)
 				if nk.NkButtonLabel(ctx, "×") != 0 {
 					g.editing.Delete(g.snapshot.SelectedIndex)
 				}
 
 				nk.NkLayoutRowEnd(ctx)
 
-				nk.NkLayoutRowBegin(ctx, nk.Static, float32(rgn.H()-padding), 3)
+				nk.NkLayoutRowBegin(ctx, nk.Static, rgn.H()-p, 3)
 
 				nk.NkLayoutRowPush(ctx, float32(rgn.W()))
 				if nk.NkGroupBegin(ctx, "MainPane", nk.WindowNoScrollbar) != 0 {
-					g.mainView.Render(ctx)
+					g.mainView.Render(ctx, scale)
 					nk.NkGroupEnd(ctx)
 				}
 

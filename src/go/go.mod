@@ -4,9 +4,7 @@ go 1.20
 
 require (
 	github.com/disintegration/gift v1.2.1
-	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71
-	github.com/go-gl/glfw v0.0.0-20240506104042-037f3cc74f2a
-	github.com/golang-ui/nuklear v0.0.0-20231115163627-2440a671efc5
+	github.com/golang-ui/nuklear v0.0.0-20260112162633-30b3743ea7ae
 	github.com/oov/downscale v0.0.0-20170819221759-1bbcb5d498e2
 	github.com/oov/psd v0.0.0-20220121172623-5db5eafcecbb
 	github.com/pkg/errors v0.9.1
@@ -21,4 +19,4 @@ require (
 	github.com/xlab/android-go v0.0.0-20221106204035-3cc54d5032fa // indirect
 )
 
-replace github.com/golang-ui/nuklear v0.0.0-20231115163627-2440a671efc5 => github.com/oov/nuklear v0.0.0-20260107095454-d876844dbdcb
+replace github.com/golang-ui/nuklear v0.0.0-20260112162633-30b3743ea7ae => github.com/oov/nuklear v0.0.0-20260113024030-32563aa46fc7

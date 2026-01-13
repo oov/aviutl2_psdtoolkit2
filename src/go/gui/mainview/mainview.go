@@ -109,7 +109,7 @@ func (mv *MainView) Clear() {
 	mv.visibleArea.Update(mv.visibleAreaImage)
 }
 
-func (mv *MainView) Render(ctx *nk.Context) {
+func (mv *MainView) Render(ctx *nk.Context, scale float32) {
 eat:
 	for {
 		select {
@@ -126,10 +126,11 @@ eat:
 
 	rgn := nk.NkWindowGetContentRegion(ctx)
 	winHeight := rgn.H()
-	const (
-		bottomPaneHeight = 48
-		padding          = 2
-	)
+	if scale <= 0 {
+		scale = 1
+	}
+	bottomPaneHeight := float32(48) * scale
+	padding := float32(2) * scale
 
 	nk.NkLayoutRowDynamic(ctx, winHeight-bottomPaneHeight-padding, 1)
 	if nk.NkGroupScrolledOffsetBegin(ctx, &mv.scrollX, &mv.scrollY, "CanvasPane", 0) != 0 {
@@ -147,7 +148,7 @@ eat:
 		mv.renderCanvas(ctx)
 		nk.NkGroupEnd(ctx)
 	}
-	nk.NkLayoutRowDynamic(ctx, float32(bottomPaneHeight-padding), 1)
+	nk.NkLayoutRowDynamic(ctx, bottomPaneHeight-padding, 1)
 	if nk.NkGroupBegin(ctx, "ScalerPane", nk.WindowNoScrollbar) != 0 {
 		nk.NkLayoutRowDynamic(ctx, 0, 1)
 		if z := float64(nk.NkSlideFloat(ctx, mv.minZoom, float32(mv.zoom), mv.maxZoom, mv.stepZoom)); z != mv.zoom {

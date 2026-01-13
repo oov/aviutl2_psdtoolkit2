@@ -39,20 +39,29 @@ func (f *font) Handle() *nk.UserFont {
 	return nil
 }
 
-func (g *GUI) initFont(symbolFont []byte) error {
+func (g *GUI) initFont(symbolFont []byte, scale float32) error {
+	if scale <= 0 {
+		scale = 1
+	}
+
+	oldSymbolHandle := g.font.SymbolHandle
+	oldSymbol := g.font.Symbol
+	oldMainHandle := g.font.MainHandle
+	oldMain := g.font.Main
+
 	// Create symbol font from embedded TTF (for icons)
-	symbol, err := nk.NkCreateFontFromBytes(symbolFont, 14)
+	symbolSize := int(float32(14)*scale + 0.5)
+	symbol, err := nk.NkCreateFontFromBytes(symbolFont, symbolSize)
 	if err != nil {
 		return err
 	}
-	g.font.Symbol = &font{gdipFont: symbol}
-	g.font.SymbolHandle = g.font.Symbol.Handle()
 
 	// Create main font chain with system fonts based on locale
 	fontList := locale.GetPreferredFontList()
 	ods.ODS("locale: detected fonts: %v", fontList.UIFonts)
 
-	fontChain := nk.NewFontChain(18)
+	mainSize := int(float32(18)*scale + 0.5)
+	fontChain := nk.NewFontChain(mainSize)
 
 	// Add system fonts from the locale-specific list
 	for _, fontName := range fontList.UIFonts {
@@ -70,9 +79,25 @@ func (g *GUI) initFont(symbolFont []byte) error {
 		ods.ODS("locale: added fallback font Tahoma to chain")
 	}
 
+	g.font.Symbol = &font{gdipFont: symbol}
+	g.font.SymbolHandle = g.font.Symbol.Handle()
+
 	g.font.Main = &font{fontChain: fontChain}
 	g.font.MainHandle = g.font.Main.Handle()
 	nk.NkStyleSetFont(g.context, g.font.MainHandle)
+
+	if oldSymbolHandle != nil {
+		oldSymbolHandle.Free()
+	}
+	if oldSymbol != nil {
+		oldSymbol.Close()
+	}
+	if oldMainHandle != nil {
+		oldMainHandle.Free()
+	}
+	if oldMain != nil {
+		oldMain.Close()
+	}
 	return nil
 }
 
@@ -118,6 +143,8 @@ func newWindow(width, height int, title string) (*window, *nk.Context, error) {
 func (w *window) Show()                 { w.w.Show() }
 func (w *window) Hide()                 { w.w.Hide() }
 func (w *window) GetSize() (int, int)   { return w.w.GetSize() }
+func (w *window) DPI() uint32           { return w.w.DPI() }
+func (w *window) Scale() float32        { return w.w.Scale() }
 func (w *window) SetShouldClose(v bool) { w.w.SetShouldClose(v) }
 func (w *window) ShouldClose() bool     { return w.w.ShouldClose() }
 func (w *window) NativeWindow() uintptr { return uintptr(w.w.Handle) }
