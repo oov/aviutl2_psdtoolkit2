@@ -75,6 +75,26 @@ static void update_cache_index(void) {
 }
 
 /**
+ * @brief Find aviutl2Manager window
+ *
+ * @return found window handle on success, desktop window handle on failure
+ */
+static HWND find_manager_window(void) {
+  static wchar_t const class_name[] = L"aviutl2Manager";
+  DWORD const pid = GetCurrentProcessId();
+  HWND h = NULL;
+  DWORD wpid;
+  while ((h = FindWindowExW(NULL, h, class_name, NULL)) != NULL) {
+    GetWindowThreadProcessId(h, &wpid);
+    if (wpid != pid) {
+      continue;
+    }
+    return h;
+  }
+  return GetDesktopWindow();
+}
+
+/**
  * @brief Hook procedure to intercept keyboard messages for the PSDToolKit window
  *
  * This hook captures keyboard input (WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_CHAR)
@@ -226,7 +246,14 @@ cleanup:
       mo_set_default(NULL);
       mo_free(&g_mo);
     }
-    ptk_logf_error(&err, "%1$hs", "%1$hs", gettext("failed to initialize plugin."));
+    wchar_t main_instruction[256];
+    ov_snprintf_wchar(main_instruction,
+                      sizeof(main_instruction) / sizeof(main_instruction[0]),
+                      L"%1$hs",
+                      L"%1$hs",
+                      gettext("failed to initialize plugin."));
+    ptk_error_dialog(
+        find_manager_window(), &err, L"PSDToolKit", main_instruction, NULL, TD_ERROR_ICON, TDCBF_OK_BUTTON);
     OV_ERROR_DESTROY(&err);
     return FALSE;
   }
@@ -515,7 +542,14 @@ void __declspec(dllexport) RegisterPlugin(struct aviutl2_host_app_table *host) {
 
 cleanup:
   if (!success) {
-    ptk_logf_error(&err, "%1$hs", "%1$hs", gettext("failed to register plugin."));
+    wchar_t main_instruction[256];
+    ov_snprintf_wchar(main_instruction,
+                      sizeof(main_instruction) / sizeof(main_instruction[0]),
+                      L"%1$hs",
+                      L"%1$hs",
+                      gettext("failed to register plugin."));
+    ptk_error_dialog(
+        find_manager_window(), &err, L"PSDToolKit", main_instruction, NULL, TD_ERROR_ICON, TDCBF_OK_BUTTON);
     OV_ERROR_DESTROY(&err);
   }
 }

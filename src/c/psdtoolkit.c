@@ -679,11 +679,11 @@ cleanup:
   }
   if (!success) {
     wchar_t main_instruction[256];
-    ov_snprintf_char2wchar(main_instruction,
-                           sizeof(main_instruction) / sizeof(main_instruction[0]),
-                           NULL,
-                           gettext("Failed to update editing image state."),
-                           NULL);
+    ov_snprintf_wchar(main_instruction,
+                      sizeof(main_instruction) / sizeof(main_instruction[0]),
+                      L"%1$hs",
+                      L"%1$hs",
+                      gettext("Failed to update editing image state."));
     ptk_error_dialog(ptk->plugin_window, &err, L"PSDToolKit", main_instruction, NULL, TD_ERROR_ICON, TDCBF_OK_BUTTON);
     OV_ERROR_DESTROY(&err);
   }
