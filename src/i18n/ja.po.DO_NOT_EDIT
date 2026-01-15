@@ -578,6 +578,9 @@ msgstr "PSD プロパティのセットに失敗しました。"
 msgid "failed to show configuration dialog."
 msgstr "設定ダイアログの表示に失敗しました。"
 
+msgid "failed to update detail list."
+msgstr "詳細リストの更新に失敗しました。"
+
 #, c-format
 msgid "file size %1$lld bytes exceeds limit."
 msgstr "ファイルサイズ %1$lld バイトは上限を超過しています。"

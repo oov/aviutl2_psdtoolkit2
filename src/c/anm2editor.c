@@ -1766,7 +1766,7 @@ cleanup:
   return success;
 }
 
-static void update_detail_panel(struct ptk_anm2editor *editor) {
+static void update_detail_list(struct ptk_anm2editor *editor) {
   if (!editor || !editor->detaillist || !editor->doc) {
     return;
   }
@@ -1803,7 +1803,7 @@ static void update_detail_panel(struct ptk_anm2editor *editor) {
 
 cleanup:
   if (!success) {
-    ptk_logf_error(&err, "%1$hs", "%1$hs", gettext("failed to update detail panel."));
+    ptk_logf_error(&err, "%1$hs", "%1$hs", gettext("failed to update detail list."));
     OV_ERROR_DESTROY(&err);
   }
 }
@@ -2059,18 +2059,18 @@ static void update_detaillist_differential(
 
   case ptk_anm2_op_reset:
     // Full rebuild needed
-    update_detail_panel(editor);
+    update_detail_list(editor);
     break;
 
   // Operations that might invalidate the current selection
   case ptk_anm2_op_selector_remove:
     // If the removed selector was selected, the TreeView selection will change,
-    // triggering TVN_SELCHANGEDW which calls update_detail_panel
+    // triggering TVN_SELCHANGEDW which calls update_detail_list
     break;
 
   case ptk_anm2_op_item_remove:
     // If the removed item was selected, the TreeView selection will change,
-    // triggering TVN_SELCHANGEDW which calls update_detail_panel
+    // triggering TVN_SELCHANGEDW which calls update_detail_list
     break;
 
   // Operations that don't affect the detail list content directly
@@ -2112,7 +2112,7 @@ static void update_detaillist_differential(
 
 cleanup:
   if (!success) {
-    ptk_logf_error(&err, "%1$hs", "%1$hs", gettext("failed to update detail list differentially."));
+    ptk_logf_error(&err, "%1$hs", "%1$hs", gettext("failed to update detail list."));
     OV_ERROR_DESTROY(&err);
   }
 }
@@ -2362,7 +2362,7 @@ static bool update_treeview_item_name(struct ptk_anm2editor *editor,
         goto cleanup;
       }
       mark_modified(editor);
-      update_detail_panel(editor);
+      update_detail_list(editor);
       success = true;
     }
   }
@@ -2485,7 +2485,7 @@ static bool refresh_all_views(struct ptk_anm2editor *editor, struct ov_error *co
     OV_ERROR_ADD_TRACE(err);
     return false;
   }
-  update_detail_panel(editor);
+  update_detail_list(editor);
   update_window_title(editor);
   update_toolbar_state(editor);
   return true;
@@ -2766,7 +2766,7 @@ static void commit_inline_edit(struct ptk_anm2editor *editor) {
             goto cleanup;
           }
           mark_modified(editor);
-          update_detail_panel(editor);
+          update_detail_list(editor);
         }
       }
       // If empty, just cancel (do nothing)
@@ -2814,7 +2814,7 @@ cleanup:
   editor->edit_committing = false;
 
   // Refresh detail panel to show updated value
-  update_detail_panel(editor);
+  update_detail_list(editor);
 }
 
 // Subclass procedure for inline edit control
@@ -3297,7 +3297,7 @@ static bool delete_selected_parameter(struct ptk_anm2editor *editor, struct ov_e
   }
 
   mark_modified(editor);
-  update_detail_panel(editor);
+  update_detail_list(editor);
   success = true;
 
 cleanup:
@@ -3630,7 +3630,7 @@ static void handle_cmd_undo(struct ptk_anm2editor *editor) {
     select_treeview_by_index(editor, editor->focus_sel_idx, editor->focus_item_idx);
   }
 
-  update_detail_panel(editor);
+  update_detail_list(editor);
 
   // Restore ListView selection if still tracking the same logical item
   if (detail_sel >= 0 && editor->focus_valid) {
@@ -3693,7 +3693,7 @@ static void handle_cmd_redo(struct ptk_anm2editor *editor) {
     select_treeview_by_index(editor, editor->focus_sel_idx, editor->focus_item_idx);
   }
 
-  update_detail_panel(editor);
+  update_detail_list(editor);
 
   // Restore ListView selection if still tracking the same logical item
   if (detail_sel >= 0 && editor->focus_valid) {
@@ -4708,7 +4708,7 @@ static LRESULT CALLBACK anm2editor_wnd_proc(HWND hwnd, UINT message, WPARAM wpar
     editor->splitter_pos = -1; // -1 means not initialized yet
 
     update_window_title(editor);
-    update_detail_panel(editor);
+    update_detail_list(editor);
     update_toolbar_state(editor);
     return 0;
   }
@@ -4923,7 +4923,7 @@ static LRESULT CALLBACK anm2editor_wnd_proc(HWND hwnd, UINT message, WPARAM wpar
       }
       InvalidateRect(editor->treeview, NULL, FALSE);
 
-      update_detail_panel(editor);
+      update_detail_list(editor);
       update_toolbar_state(editor);
       return 0;
     }
@@ -5604,7 +5604,7 @@ bool ptk_anm2editor_open(struct ptk_anm2editor *editor, wchar_t const *path, str
   editor->modified = false;
 
   // Update UI (TreeView is already updated via reset notification)
-  update_detail_panel(editor);
+  update_detail_list(editor);
   update_window_title(editor);
   update_toolbar_state(editor);
 
@@ -5790,7 +5790,7 @@ bool ptk_anm2editor_set_psd_path(struct ptk_anm2editor *editor, char const *path
   }
 
   mark_modified(editor);
-  update_detail_panel(editor);
+  update_detail_list(editor);
   return true;
 }
 
@@ -6151,7 +6151,7 @@ bool ptk_anm2editor_set_param_value(struct ptk_anm2editor *editor,
   }
 
   mark_modified(editor);
-  update_detail_panel(editor);
+  update_detail_list(editor);
   return true;
 }
 
