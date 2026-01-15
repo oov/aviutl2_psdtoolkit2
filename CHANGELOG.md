@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.0.0alpha6 2026-01-15
 
 - スクリプト名の多言語化で漏れがあったのを修正
 - PSDToolKit ウィンドウをDPIスケーリングに対応
