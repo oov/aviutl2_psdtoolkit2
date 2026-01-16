@@ -5,9 +5,26 @@ package nkhelper
 
 import (
 	"image"
+	"syscall"
 
 	"github.com/golang-ui/nuklear/nk"
 )
+
+var (
+	user32            = syscall.NewLazyDLL("user32.dll")
+	pGetAsyncKeyState = user32.NewProc("GetAsyncKeyState")
+)
+
+const (
+	VK_SHIFT   = 0x10
+	VK_CONTROL = 0x11
+	VK_MENU    = 0x12
+)
+
+func GetAsyncKeyState(vk int) int16 {
+	ret, _, _ := pGetAsyncKeyState.Call(uintptr(vk))
+	return int16(ret)
+}
 
 type Texture struct {
 	img *nk.GdipImage

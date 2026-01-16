@@ -201,7 +201,7 @@ func drawTextMiddle(canvas *nk.CommandBuffer, rect nk.Rect, s string, font *nk.U
 	nk.NkDrawText(canvas, r, s, int32(len(s)), font, nk.Color{}, col)
 }
 
-func (lv *LayerView) layerTreeItem(ctx *nk.Context, indent, thumbSize float32, thumb *nk.Image, visible, forceVisible bool, l *composite.Layer) (clicked int, ctrl bool) {
+func (lv *LayerView) layerTreeItem(ctx *nk.Context, indent, thumbSize float32, thumb *nk.Image, visible, forceVisible bool, l *composite.Layer) int {
 	scale := lv.scale
 	if scale <= 0 {
 		scale = 1
@@ -244,8 +244,9 @@ func (lv *LayerView) layerTreeItem(ctx *nk.Context, indent, thumbSize float32, t
 
 	var rect nk.Rect
 	state := nk.NkWidget(&rect, ctx)
+	var clicked int
 	if state == 0 {
-		return 0, false
+		return 0
 	}
 
 	canvas := nk.NkWindowGetCanvas(ctx)
@@ -260,7 +261,6 @@ func (lv *LayerView) layerTreeItem(ctx *nk.Context, indent, thumbSize float32, t
 			if nk.NkInputIsMousePressed(ctx.Input(), nk.ButtonRight) != 0 {
 				clicked |= 2
 			}
-			ctrl = nk.NkInputIsKeyDown(ctx.Input(), nk.KeyCtrl) != 0
 		}
 	}
 	nk.NkFillRect(canvas, rect, 4, bg)
@@ -301,7 +301,7 @@ func (lv *LayerView) layerTreeItem(ctx *nk.Context, indent, thumbSize float32, t
 	if layerName != "" {
 		drawTextMiddle(canvas, rect, layerName, lv.mainFontHandle, fg)
 	}
-	return clicked, ctrl
+	return clicked
 }
 
 func (lv *LayerView) layoutLayer(ctx *nk.Context, image *img.Image, indent float32, l *composite.Layer, visible bool) bool {
@@ -315,8 +315,9 @@ func (lv *LayerView) layoutLayer(ctx *nk.Context, image *img.Image, indent float
 	_, forceVisible := image.Layers.ForceVisible[img.SeqID(l.SeqID)]
 	thumb, _ := lv.thumbnailChip[l.SeqID]
 	nk.NkLayoutSpaceBegin(ctx, nk.Static, float32(28)*lv.scale, 3)
-	if clicked, ctrl := lv.layerTreeItem(ctx, indent, float32(lv.thumbnailSize), thumb, visible, forceVisible, l); clicked != 0 {
+	if clicked := lv.layerTreeItem(ctx, indent, float32(lv.thumbnailSize), thumb, visible, forceVisible, l); clicked != 0 {
 		if clicked&1 == 1 {
+			ctrl := nkhelper.GetAsyncKeyState(nkhelper.VK_CONTROL) < 0
 			if ctrl {
 				modified = image.Layers.SetVisibleExclusive(img.SeqID(l.SeqID), !l.Visible) || modified
 			} else {

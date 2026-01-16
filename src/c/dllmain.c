@@ -99,16 +99,64 @@ static HWND find_manager_window(void) {
 }
 
 /**
+ * @brief Check if the mouse cursor is over the window
+ *
+ * @param window Target window handle
+ * @return true if cursor is over the window, false otherwise
+ */
+static bool is_cursor_over_window(HWND window) {
+  POINT pt = {0};
+  RECT rc = {0};
+  HWND toplevel = NULL;
+  HWND under_cursor = NULL;
+  HWND under_cursor_toplevel = NULL;
+  POINT client_pt = {0};
+  HWND at_point = NULL;
+  HWND child = NULL;
+
+  GetCursorPos(&pt);
+  if (!GetWindowRect(window, &rc) || !PtInRect(&rc, pt)) {
+    return false;
+  }
+
+  toplevel = GetAncestor(window, GA_ROOT);
+  if (!IsWindowEnabled(toplevel) || !IsWindowVisible(toplevel) || GetForegroundWindow() != toplevel) {
+    return false;
+  }
+
+  under_cursor = WindowFromPoint(pt);
+  under_cursor_toplevel = GetAncestor(under_cursor, GA_ROOT);
+  if (under_cursor_toplevel != toplevel) {
+    return false;
+  }
+
+  client_pt = pt;
+  ScreenToClient(toplevel, &client_pt);
+  at_point = toplevel;
+  while ((child = RealChildWindowFromPoint(at_point, client_pt)) != NULL && child != at_point) {
+    MapWindowPoints(at_point, child, &client_pt, 1);
+    at_point = child;
+  }
+  if (at_point != window && !IsChild(window, at_point)) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * @brief Hook procedure to intercept keyboard messages for the PSDToolKit window
  *
  * This hook captures keyboard input (WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_CHAR)
- * when the mouse cursor is over the PSDToolKit window, and forwards them to the window.
- * This allows the PSDToolKit window to receive keyboard shortcuts even when it doesn't have focus.
+ * and forwards them to the PSDToolKit window under specific conditions:
  *
- * The hook performs several checks before forwarding:
- * - Verifies the cursor is within the plugin window bounds
- * - Ensures no other window is obscuring the plugin window
- * - Skips forwarding when the top-level window is disabled (e.g. modal dialog is open)
+ * 1. If the key is already tracked (key_state bit is set), always forward (for repeat and key-up)
+ * 2. Otherwise, only forward if mouse cursor is over the PSDToolKit window
+ *
+ * This approach ensures:
+ * - Key-up messages are always delivered for keys that had key-down forwarded
+ * - Window position checks are only performed when necessary (new key press)
+ * - No "stuck key" states in the target window's input handling
  *
  * @param code Hook code from Windows
  * @param wparam Additional message information
@@ -117,57 +165,61 @@ static HWND find_manager_window(void) {
  */
 static LRESULT CALLBACK get_msg_hook_proc(int code, WPARAM wparam, LPARAM lparam) {
   static HWND psdtoolkit_window = NULL;
+  static ov_bitarray key_state[256 / 8 / sizeof(ov_bitarray)] = {0};
+
+  bool forward = false;
+  MSG *msg = (MSG *)lparam;
 
   if (code < 0 || !g_plugin_window) {
     goto cleanup;
   }
+
   {
-    MSG *msg = (MSG *)lparam;
-    if (msg->message != WM_KEYDOWN && msg->message != WM_KEYUP && msg->message != WM_SYSKEYDOWN &&
-        msg->message != WM_SYSKEYUP && msg->message != WM_CHAR) {
+    bool const is_keydown = (msg->message == WM_KEYDOWN || msg->message == WM_SYSKEYDOWN);
+    bool const is_keyup = (msg->message == WM_KEYUP || msg->message == WM_SYSKEYUP);
+    if (!is_keydown && !is_keyup && msg->message != WM_CHAR) {
       goto cleanup;
     }
-    POINT pt;
-    RECT rc;
-    GetCursorPos(&pt);
-    if (!GetWindowRect(g_plugin_window, &rc) || !PtInRect(&rc, pt)) {
+
+    uint8_t const vk = (uint8_t)msg->wParam;
+
+    // If key_state bit is already set, this is a repeat or key-up for a tracked key.
+    // Always forward without checking mouse position.
+    if (ov_bitarray_get(key_state, vk)) {
+      if (is_keyup) {
+        ov_bitarray_clear(key_state, vk);
+      }
+      forward = true;
       goto cleanup;
     }
-    // Check if the cursor is actually over our window (not obscured by another window)
-    HWND under_cursor = WindowFromPoint(pt);
-    HWND toplevel = GetAncestor(g_plugin_window, GA_ROOT);
-    // Skip if top-level window is disabled (e.g. a modal dialog is open)
-    if (!IsWindowEnabled(toplevel)) {
+    // Key-up for untracked key - ignore
+    if (is_keyup) {
       goto cleanup;
     }
-    HWND under_cursor_toplevel = GetAncestor(under_cursor, GA_ROOT);
-    if (under_cursor_toplevel != toplevel) {
-      goto cleanup;
-    }
+
+    // Check mouse position for new key press
+    // Get and cache PSDToolKit window handle
     if (!psdtoolkit_window) {
       psdtoolkit_window = GetWindow(g_plugin_window, GW_CHILD);
     }
     if (!psdtoolkit_window) {
       goto cleanup;
     }
-    // Find the deepest visible child window at the cursor position
-    POINT client_pt = pt;
-    ScreenToClient(toplevel, &client_pt);
-    HWND at_point = toplevel;
-    HWND child;
-    while ((child = RealChildWindowFromPoint(at_point, client_pt)) != NULL && child != at_point) {
-      MapWindowPoints(at_point, child, &client_pt, 1);
-      at_point = child;
-    }
-    if (at_point != psdtoolkit_window && !IsChild(psdtoolkit_window, at_point)) {
+    // Check mouse position only for new key press
+    if (!is_cursor_over_window(psdtoolkit_window)) {
       goto cleanup;
     }
-    // Forward the message to the PSDToolKit window
-    PostMessageW(psdtoolkit_window, msg->message, msg->wParam, msg->lParam);
-    msg->message = WM_NULL;
+    if (is_keydown) {
+      // New key press in our window - track it
+      ov_bitarray_set(key_state, vk);
+    }
+    forward = true;
   }
 
 cleanup:
+  if (forward) {
+    PostMessageW(psdtoolkit_window, msg->message, msg->wParam, msg->lParam);
+  }
   return CallNextHookEx(g_msg_hook, code, wparam, lparam);
 }
 
