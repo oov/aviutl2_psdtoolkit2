@@ -297,6 +297,16 @@ static void commit_edit_internal(struct anm2editor_detail *detail) {
       break;
     }
 
+    case anm2editor_detail_row_type_default_character_id: {
+      // Empty string means clear character ID (NULL)
+      char const *char_id = (value[0] == '\0') ? NULL : value;
+      if (!ptk_anm2_edit_set_default_character_id(detail->edit, char_id, &err)) {
+        OV_ERROR_ADD_TRACE(&err);
+        goto cleanup;
+      }
+      break;
+    }
+
     case anm2editor_detail_row_type_multisel_item: {
       uint32_t const item_id = row_info->item_id;
       if (detail->edit_column == 0) {
@@ -726,6 +736,7 @@ void anm2editor_detail_start_edit(struct anm2editor_detail *detail, size_t row_i
   case anm2editor_detail_row_type_psd_path:
   case anm2editor_detail_row_type_exclusive_support_default:
   case anm2editor_detail_row_type_information:
+  case anm2editor_detail_row_type_default_character_id:
     // These rows can only edit the Value column (column 1)
     if (column != 1) {
       return;

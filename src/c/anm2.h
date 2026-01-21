@@ -38,6 +38,7 @@ enum ptk_anm2_op_type {
   ptk_anm2_op_set_psd_path,
   ptk_anm2_op_set_exclusive_support_default,
   ptk_anm2_op_set_information,
+  ptk_anm2_op_set_default_character_id,
 
   // Selector operations
   ptk_anm2_op_selector_insert,
@@ -278,6 +279,30 @@ char const *ptk_anm2_get_information(struct ptk_anm2 const *doc);
  * @return true on success, false on failure
  */
 NODISCARD bool ptk_anm2_set_information(struct ptk_anm2 *doc, char const *information, struct ov_error *const err);
+
+/**
+ * @brief Get the default character ID for multi-script format
+ *
+ * Used in @name.ptk.anm2 multi-script files to set the default character ID
+ * for the "Parts Override" script.
+ *
+ * @param doc Document handle
+ * @return Default character ID string (owned by doc, do not free), NULL if not set
+ */
+char const *ptk_anm2_get_default_character_id(struct ptk_anm2 const *doc);
+
+/**
+ * @brief Set the default character ID for multi-script format
+ *
+ * Records UNDO operation.
+ *
+ * @param doc Document handle
+ * @param character_id New character ID string (NULL or empty to clear)
+ * @param err Error information
+ * @return true on success, false on failure
+ */
+NODISCARD bool
+ptk_anm2_set_default_character_id(struct ptk_anm2 *doc, char const *character_id, struct ov_error *const err);
 
 /**
  * @brief Get the document version

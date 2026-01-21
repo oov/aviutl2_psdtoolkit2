@@ -4548,6 +4548,182 @@ static void test_selector_would_move_actual_move(void) {
   ptk_anm2_destroy(&doc);
 }
 
+// Test default_character_id get/set
+static void test_default_character_id_set_get(void) {
+  struct ov_error err = {0};
+  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
+
+  // Initial value should be NULL
+  TEST_CHECK(ptk_anm2_get_default_character_id(doc) == NULL);
+
+  // Set character ID
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_set_default_character_id(doc, "chara1", &err), &err);
+  {
+    char const *id = ptk_anm2_get_default_character_id(doc);
+    TEST_CHECK(id != NULL && strcmp(id, "chara1") == 0);
+  }
+
+  // Set to different value
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_set_default_character_id(doc, "chara2", &err), &err);
+  {
+    char const *id = ptk_anm2_get_default_character_id(doc);
+    TEST_CHECK(id != NULL && strcmp(id, "chara2") == 0);
+  }
+
+  // Set to empty string clears it
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_set_default_character_id(doc, "", &err), &err);
+  TEST_CHECK(ptk_anm2_get_default_character_id(doc) == NULL);
+
+  // Set to NULL also clears it
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_set_default_character_id(doc, "test", &err), &err);
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_set_default_character_id(doc, NULL, &err), &err);
+  TEST_CHECK(ptk_anm2_get_default_character_id(doc) == NULL);
+
+  ptk_anm2_destroy(&doc);
+}
+
+// Test default_character_id undo/redo
+static void test_default_character_id_undo_redo(void) {
+  struct ov_error err = {0};
+  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
+
+  // Set character ID
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_set_default_character_id(doc, "chara1", &err), &err);
+  {
+    char const *id = ptk_anm2_get_default_character_id(doc);
+    TEST_CHECK(id != NULL && strcmp(id, "chara1") == 0);
+  }
+
+  // Undo - should be NULL
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_undo(doc, &err), &err);
+  TEST_CHECK(ptk_anm2_get_default_character_id(doc) == NULL);
+
+  // Redo - should be "chara1" again
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_redo(doc, &err), &err);
+  {
+    char const *id = ptk_anm2_get_default_character_id(doc);
+    TEST_CHECK(id != NULL && strcmp(id, "chara1") == 0);
+  }
+
+  ptk_anm2_destroy(&doc);
+}
+
+// Test multiscript format save/load
+static void test_save_load_multiscript(void) {
+  struct ov_error err = {0};
+  struct ptk_anm2 *doc = NULL;
+  struct ptk_anm2 *loaded_doc = NULL;
+  struct ptk_anm2 *loaded_obj2_doc = NULL;
+  wchar_t temp_dir[MAX_PATH] = {0};
+  wchar_t temp_path[MAX_PATH] = {0};
+  wchar_t obj2_path[MAX_PATH] = {0};
+  uint32_t sel_id = 0;
+
+  doc = ptk_anm2_new(&err);
+  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
+
+  // Create temp file path with @ prefix
+#ifdef _WIN32
+  if (!GetTempPathW(MAX_PATH, temp_dir)) {
+    TEST_MSG("Failed to get temp path");
+    goto cleanup;
+  }
+  // Create path with @ prefix for multiscript format
+  ov_snprintf_char2wchar(temp_path, MAX_PATH, "%ls@test_multi.ptk.anm2", "%ls@test_multi.ptk.anm2", temp_dir);
+  // Corresponding .obj2 path
+  ov_snprintf_char2wchar(obj2_path, MAX_PATH, "%ls@test_multi.ptk.obj2", "%ls@test_multi.ptk.obj2", temp_dir);
+#else
+  TEST_MSG("Test only supported on Windows");
+  goto cleanup;
+#endif
+
+  // Set up document
+  if (!TEST_SUCCEEDED(ptk_anm2_set_psd_path(doc, "test.psd", &err), &err)) {
+    goto cleanup;
+  }
+  if (!TEST_SUCCEEDED(ptk_anm2_set_default_character_id(doc, "mychar", &err), &err)) {
+    goto cleanup;
+  }
+
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Expression", &err);
+  if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
+    goto cleanup;
+  }
+  if (!TEST_SUCCEEDED(ptk_anm2_item_insert_value(doc, sel_id, "Happy", "layer/happy", &err), &err)) {
+    goto cleanup;
+  }
+  if (!TEST_SUCCEEDED(ptk_anm2_item_insert_value(doc, sel_id, "Sad", "layer/sad", &err), &err)) {
+    goto cleanup;
+  }
+
+  // Save in multiscript format
+  if (!TEST_SUCCEEDED(ptk_anm2_save(doc, temp_path, &err), &err)) {
+    goto cleanup;
+  }
+
+  // Load into new document
+  loaded_doc = ptk_anm2_new(&err);
+  if (!TEST_CHECK(loaded_doc != NULL)) {
+    goto cleanup;
+  }
+  if (!TEST_SUCCEEDED(ptk_anm2_load(loaded_doc, temp_path, &err), &err)) {
+    goto cleanup;
+  }
+
+  // Verify loaded content
+  {
+    char const *psd = ptk_anm2_get_psd_path(loaded_doc);
+    TEST_CHECK(psd != NULL && strcmp(psd, "test.psd") == 0);
+  }
+  {
+    char const *char_id = ptk_anm2_get_default_character_id(loaded_doc);
+    TEST_CHECK(char_id != NULL && strcmp(char_id, "mychar") == 0);
+  }
+  TEST_CHECK(ptk_anm2_selector_count(loaded_doc) == 1);
+  {
+    uint32_t loaded_sel_id = ptk_anm2_selector_get_id(loaded_doc, 0);
+    TEST_CHECK(ptk_anm2_item_count(loaded_doc, loaded_sel_id) == 2);
+  }
+
+  // Verify .obj2 file was created and can be loaded
+  {
+    DWORD attrs = GetFileAttributesW(obj2_path);
+    TEST_CHECK(attrs != INVALID_FILE_ATTRIBUTES);
+    TEST_MSG("obj2 file should exist");
+  }
+
+  // Load .obj2 file and verify content
+  loaded_obj2_doc = ptk_anm2_new(&err);
+  if (!TEST_CHECK(loaded_obj2_doc != NULL)) {
+    goto cleanup;
+  }
+  if (!TEST_SUCCEEDED(ptk_anm2_load(loaded_obj2_doc, obj2_path, &err), &err)) {
+    goto cleanup;
+  }
+
+  // Verify .obj2 loaded content matches
+  {
+    char const *psd = ptk_anm2_get_psd_path(loaded_obj2_doc);
+    TEST_CHECK(psd != NULL && strcmp(psd, "test.psd") == 0);
+  }
+  {
+    char const *char_id = ptk_anm2_get_default_character_id(loaded_obj2_doc);
+    TEST_CHECK(char_id != NULL && strcmp(char_id, "mychar") == 0);
+  }
+  TEST_CHECK(ptk_anm2_selector_count(loaded_obj2_doc) == 1);
+
+cleanup:
+#ifdef _WIN32
+  DeleteFileW(temp_path);
+  DeleteFileW(obj2_path);
+#endif
+  ptk_anm2_destroy(&doc);
+  ptk_anm2_destroy(&loaded_doc);
+  ptk_anm2_destroy(&loaded_obj2_doc);
+}
+
 TEST_LIST = {
     // Document lifecycle
     {"new_destroy", test_new_destroy},
@@ -4668,5 +4844,10 @@ TEST_LIST = {
     {"item_would_move_actual_move", test_item_would_move_actual_move},
     {"selector_would_move_same_position", test_selector_would_move_same_position},
     {"selector_would_move_actual_move", test_selector_would_move_actual_move},
+    // default_character_id tests
+    {"default_character_id_set_get", test_default_character_id_set_get},
+    {"default_character_id_undo_redo", test_default_character_id_undo_redo},
+    // Multiscript format tests
+    {"save_load_multiscript", test_save_load_multiscript},
     {NULL, NULL},
 };

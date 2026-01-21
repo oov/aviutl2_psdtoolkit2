@@ -306,6 +306,16 @@ static bool update_detail_document(struct ptk_anm2editor *editor, struct ov_erro
       OV_ERROR_ADD_TRACE(err);
       goto cleanup;
     }
+
+    if (!anm2editor_detail_add_row(
+            editor->detail,
+            pgettext("anm2editor", "Default Character ID"),
+            ptk_anm2_edit_get_default_character_id(editor->edit_core),
+            &(struct anm2editor_detail_row){.type = anm2editor_detail_row_type_default_character_id},
+            err)) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
   }
 
   success = true;
@@ -1622,6 +1632,15 @@ bool ptk_anm2editor_save_as(struct ptk_anm2editor *editor, struct ov_error *err)
   }
 
   if (name_len > 0) {
+    // Add @ prefix if not already present
+    if (name_buf[0] != L'@') {
+      // Shift content to make room for @
+      if (name_len + 1 < MAX_PATH) {
+        memmove(name_buf + 1, name_buf, (name_len + 1) * sizeof(wchar_t));
+        name_buf[0] = L'@';
+        name_len++;
+      }
+    }
     size_t const dir_len = OV_ARRAY_LENGTH(default_path);
     if (!OV_ARRAY_GROW(&default_path, dir_len + name_len + 1)) {
       OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);

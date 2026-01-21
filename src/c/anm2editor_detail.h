@@ -14,6 +14,7 @@ enum anm2editor_detail_row_type {
   anm2editor_detail_row_type_psd_path,                  // PSD File Path property (document level)
   anm2editor_detail_row_type_exclusive_support_default, // Exclusive Support Default property (document level)
   anm2editor_detail_row_type_information,               // Information property (document level)
+  anm2editor_detail_row_type_default_character_id,      // Default Character ID property (document level)
   anm2editor_detail_row_type_multisel_item,             // Value item in multi-selection mode
   anm2editor_detail_row_type_animation_param,           // Animation item parameter
   anm2editor_detail_row_type_value_item,                // Value item (single selection)

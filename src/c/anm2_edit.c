@@ -363,6 +363,7 @@ void ptk_anm2_edit_update_on_doc_op(
   case ptk_anm2_op_set_psd_path:
   case ptk_anm2_op_set_exclusive_support_default:
   case ptk_anm2_op_set_information:
+  case ptk_anm2_op_set_default_character_id:
     // Document property changes only affect detail view
     event.op = ptk_anm2_edit_view_detail_refresh;
     notify_view(edit, &event);
@@ -1085,6 +1086,24 @@ NODISCARD bool ptk_anm2_edit_set_information(struct ptk_anm2_edit *edit, char co
   return true;
 }
 
+NODISCARD bool
+ptk_anm2_edit_set_default_character_id(struct ptk_anm2_edit *edit, char const *char_id, struct ov_error *err) {
+  if (!edit || !edit->doc) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
+    return false;
+  }
+  char const *current = ptk_anm2_get_default_character_id(edit->doc);
+  char const *value = (char_id && char_id[0] != '\0') ? char_id : NULL;
+  if ((value == NULL && current == NULL) || (value && current && strcmp(value, current) == 0)) {
+    return true;
+  }
+  if (!ptk_anm2_set_default_character_id(edit->doc, value, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    return false;
+  }
+  return true;
+}
+
 char const *ptk_anm2_edit_get_label(struct ptk_anm2_edit const *edit) {
   if (!edit || !edit->doc) {
     return NULL;
@@ -1111,6 +1130,13 @@ bool ptk_anm2_edit_get_exclusive_support_default(struct ptk_anm2_edit const *edi
     return false;
   }
   return ptk_anm2_get_exclusive_support_default(edit->doc);
+}
+
+char const *ptk_anm2_edit_get_default_character_id(struct ptk_anm2_edit const *edit) {
+  if (!edit || !edit->doc) {
+    return NULL;
+  }
+  return ptk_anm2_get_default_character_id(edit->doc);
 }
 
 size_t ptk_anm2_edit_selector_count(struct ptk_anm2_edit const *edit) {

@@ -56,6 +56,7 @@ struct ptk_anm2 {
   char *label;
   char *psd_path;
   char *information;              // NULL = auto-generate from psd_path
+  char *default_character_id;     // Default character ID for multi-script format
   bool exclusive_support_default; // Default value for exclusive support control checkbox
   struct selector *selectors;     // ovarray
   struct ptk_anm2_op *undo_stack; // ovarray
@@ -165,6 +166,7 @@ static void op_free(struct ptk_anm2_op *op) {
     case ptk_anm2_op_set_psd_path:
     case ptk_anm2_op_set_exclusive_support_default:
     case ptk_anm2_op_set_information:
+    case ptk_anm2_op_set_default_character_id:
     case ptk_anm2_op_selector_set_name:
     case ptk_anm2_op_selector_move:
     case ptk_anm2_op_item_set_name:
@@ -531,6 +533,11 @@ static bool generate_json_line(char **const content,
     yyjson_mut_obj_add_strcpy(jdoc, root, "information", doc->information);
   }
 
+  // default_character_id (only store if set)
+  if (doc->default_character_id && doc->default_character_id[0] != '\0') {
+    yyjson_mut_obj_add_strcpy(jdoc, root, "defaultCharacterId", doc->default_character_id);
+  }
+
   // Write JSON to string using custom allocator
   json_str = yyjson_mut_write_opts(jdoc, 0, ptk_json_get_alc(), NULL, NULL);
   if (!json_str) {
@@ -797,7 +804,189 @@ cleanup:
   return success;
 }
 
-// Initialize document structure (does not allocate the struct itself)
+static bool
+generate_parts_override_script(struct ptk_anm2 const *const doc, char **const content, struct ov_error *const err) {
+  bool success = false;
+
+  // Note: Header (@OverwriteSelector) is added by caller (generate_obj2_content)
+
+  // --value@id: line with default character ID
+  {
+    char const *const char_id = doc->default_character_id ? doc->default_character_id : "";
+    if (!ov_sprintf_append_char(content,
+                                err,
+                                "%1$hs%2$s",
+                                "--value@id:%1$hs,\"%2$s\"\n",
+                                pgettext(".ptk.anm2 OverwriteSelector", "Character ID"),
+                                char_id)) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+  }
+
+  // --select@pN: lines for each non-empty selector (max 16)
+  {
+    size_t const selectors_len = OV_ARRAY_LENGTH(doc->selectors);
+    size_t part_num = 0;
+    for (size_t i = 0; i < selectors_len && part_num < 16; i++) {
+      struct selector const *const sel = &doc->selectors[i];
+      size_t const items_len = OV_ARRAY_LENGTH(sel->items);
+
+      if (items_len == 0) {
+        continue;
+      }
+
+      part_num++;
+
+      // --select@pN:SelectorName,(None)=0,Item1=1,Item2=2,...
+      char const *const sel_name =
+          sel->name ? sel->name : pgettext(".ptk.anm2 default name for unnamed selector", "Selector");
+      if (!ov_sprintf_append_char(content, err, "%1$zu%2$hs", "--select@p%1$zu:%2$hs", part_num, sel_name)) {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+
+      // (None)=0 as first option
+      if (!ov_sprintf_append_char(
+              content, err, "%1$hs", ",%1$hs=0", pgettext(".ptk.anm2 Unselected item name for selector", "(None)"))) {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+
+      // Item options
+      for (size_t j = 0; j < items_len; j++) {
+        struct item const *const item = &sel->items[j];
+        char const *display_name = item->name;
+        if (!display_name || display_name[0] == '\0') {
+          display_name = item->script_name;
+        }
+        if (display_name && display_name[0] != '\0') {
+          if (!ov_sprintf_append_char(content, err, "%1$s%2$zu", ",%1$s=%2$zu", display_name, j + 1)) {
+            OV_ERROR_ADD_TRACE(err);
+            goto cleanup;
+          }
+        }
+      }
+
+      if (!ov_sprintf_append_char(content, err, NULL, "\n")) {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+    }
+  }
+
+  // Generate Lua code for set_layer_selector_overwriter
+  {
+    if (!ov_sprintf_append_char(
+            content,
+            err,
+            NULL,
+            "require(\"PSDToolKit\").psdcall(function()\n"
+            "  require(\"PSDToolKit\").set_layer_selector_overwriter(id ~= \"\" and id or nil, {\n")) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+
+    // p1 = p1 ~= 0 and p1 or nil, ...
+    size_t const selectors_len = OV_ARRAY_LENGTH(doc->selectors);
+    size_t part_num = 0;
+    for (size_t i = 0; i < selectors_len && part_num < 16; i++) {
+      if (OV_ARRAY_LENGTH(doc->selectors[i].items) == 0) {
+        continue;
+      }
+      part_num++;
+      if (!ov_sprintf_append_char(
+              content, err, "%1$zu%2$zu", "    p%1$zu = p%2$zu ~= 0 and p%2$zu or nil,\n", part_num, part_num)) {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+    }
+
+    if (!ov_sprintf_append_char(content, err, NULL, "  }, obj)\nend)\n")) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+  }
+
+  success = true;
+
+cleanup:
+  return success;
+}
+
+static bool
+generate_multiscript_content(struct ptk_anm2 const *const doc, char **const content, struct ov_error *const err) {
+  char *single_content = NULL;
+  bool success = false;
+
+  // Generate single-script content first
+  if (!generate_script_content(doc, &single_content, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
+  // Add @Selector header before the single script content
+  if (!ov_sprintf_append_char(
+          content, err, "%1$hs", "@%1$hs\n", pgettext(".ptk.anm2 multi-script section name", "Selector"))) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
+  // Append single script content
+  {
+    size_t const single_len = OV_ARRAY_LENGTH(single_content);
+    size_t const content_len = OV_ARRAY_LENGTH(*content);
+    if (!OV_ARRAY_GROW(content, content_len + single_len + 1)) {
+      OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+      goto cleanup;
+    }
+    memcpy(*content + content_len, single_content, single_len + 1);
+    OV_ARRAY_SET_LENGTH(*content, content_len + single_len);
+  }
+
+  // Note: Parts override script is now generated in a separate .obj2 file
+
+  success = true;
+
+cleanup:
+  if (single_content) {
+    OV_ARRAY_DESTROY(&single_content);
+  }
+  return success;
+}
+
+static bool generate_obj2_content(struct ptk_anm2 const *const doc, char **const content, struct ov_error *const err) {
+  bool success = false;
+
+  // Add @OverwriteSelector header
+  if (!ov_sprintf_append_char(
+          content, err, "%1$hs", "@%1$hs\n", pgettext(".ptk.anm2 multi-script section name", "OverwriteSelector"))) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
+  // Generate JSON metadata line (same as in main script)
+  // For obj2, we still need the JSON metadata so the editor can load it
+  {
+    // Calculate a dummy checksum (obj2 files don't need checksum verification)
+    // We use 0 as the checksum since the obj2 content is auto-generated
+    if (!generate_json_line(content, doc, 0, err)) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+  }
+
+  // Generate parts override script content
+  if (!generate_parts_override_script(doc, content, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
+  success = true;
+
+cleanup:
+  return success;
+}
 // Cleanup document contents (does not free the struct itself)
 static void doc_cleanup(struct ptk_anm2 *doc) {
   if (!doc) {
@@ -811,6 +1000,9 @@ static void doc_cleanup(struct ptk_anm2 *doc) {
   }
   if (doc->information) {
     OV_ARRAY_DESTROY(&doc->information);
+  }
+  if (doc->default_character_id) {
+    OV_ARRAY_DESTROY(&doc->default_character_id);
   }
   if (doc->selectors) {
     size_t const n = OV_ARRAY_LENGTH(doc->selectors);
@@ -982,6 +1174,30 @@ apply_op(struct ptk_anm2 *doc, struct ptk_anm2_op *op, struct ptk_anm2_op *rever
       }
     } else {
       doc->information = NULL;
+    }
+    break;
+
+  case ptk_anm2_op_set_default_character_id:
+    // Save current value as reverse
+    if (doc->default_character_id) {
+      if (!strdup_to_array(&reverse_op->str_data, doc->default_character_id, err)) {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+    } else {
+      reverse_op->str_data = NULL;
+    }
+    // Apply new value (op->str_data may be NULL to clear)
+    if (doc->default_character_id) {
+      OV_ARRAY_DESTROY(&doc->default_character_id);
+    }
+    if (op->str_data) {
+      if (!strdup_to_array(&doc->default_character_id, op->str_data, err)) {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+    } else {
+      doc->default_character_id = NULL;
     }
     break;
 
@@ -1546,6 +1762,7 @@ apply_op(struct ptk_anm2 *doc, struct ptk_anm2_op *op, struct ptk_anm2_op *rever
   case ptk_anm2_op_set_psd_path:
   case ptk_anm2_op_set_exclusive_support_default:
   case ptk_anm2_op_set_information:
+  case ptk_anm2_op_set_default_character_id:
     notify_change(doc, op->type, 0, 0, 0);
     break;
   case ptk_anm2_op_selector_insert: {
@@ -1791,6 +2008,59 @@ bool ptk_anm2_set_information(struct ptk_anm2 *doc, char const *information, str
   op.type = ptk_anm2_op_set_information;
   if (information) {
     if (!strdup_to_array(&op.str_data, information, err)) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+  } else {
+    op.str_data = NULL;
+  }
+
+  // Apply the operation
+  if (!apply_op(doc, &op, &reverse_op, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
+  // Push reverse operation to undo stack
+  if (!push_undo_op(doc, &reverse_op, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+  memset(&reverse_op, 0, sizeof(reverse_op)); // ownership transferred
+
+  // Clear redo stack
+  clear_redo_stack(doc);
+  notify_state(doc);
+
+  success = true;
+
+cleanup:
+  op_free(&op);
+  op_free(&reverse_op);
+  return success;
+}
+
+char const *ptk_anm2_get_default_character_id(struct ptk_anm2 const *doc) {
+  if (!doc) {
+    return NULL;
+  }
+  return doc->default_character_id;
+}
+
+bool ptk_anm2_set_default_character_id(struct ptk_anm2 *doc, char const *character_id, struct ov_error *const err) {
+  if (!doc) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
+    return false;
+  }
+
+  bool success = false;
+  struct ptk_anm2_op op = {0};
+  struct ptk_anm2_op reverse_op = {0};
+
+  // Build SET_DEFAULT_CHARACTER_ID operation with new value
+  op.type = ptk_anm2_op_set_default_character_id;
+  if (character_id && character_id[0] != '\0') {
+    if (!strdup_to_array(&op.str_data, character_id, err)) {
       OV_ERROR_ADD_TRACE(err);
       goto cleanup;
     }
@@ -3409,6 +3679,17 @@ parse_metadata_json(char const *json_str, size_t json_len, struct ptk_anm2 *doc,
     }
   }
 
+  // default_character_id
+  {
+    yyjson_val *v = yyjson_obj_get(root, "defaultCharacterId");
+    if (v && yyjson_is_str(v)) {
+      if (!strdup_to_array(&doc->default_character_id, yyjson_get_str(v), err)) {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+    }
+  }
+
   // selectors
   {
     yyjson_val *selectors = yyjson_obj_get(root, "selectors");
@@ -3621,16 +3902,35 @@ bool ptk_anm2_save(struct ptk_anm2 *doc, wchar_t const *path, struct ov_error *c
   }
 
   char *content = NULL;
+  char *obj2_content = NULL;
+  wchar_t *obj2_path = NULL;
   struct ovl_file *file = NULL;
   bool success = false;
 
+  // Check if filename starts with @ to determine multi-script mode
+  // Find the filename part (after last path separator)
+  wchar_t const *filename = path;
+  for (wchar_t const *p = path; *p; p++) {
+    if (*p == L'/' || *p == L'\\') {
+      filename = p + 1;
+    }
+  }
+  bool const is_multiscript = (filename[0] == L'@');
+
   // Generate script content
-  if (!generate_script_content(doc, &content, err)) {
-    OV_ERROR_ADD_TRACE(err);
-    goto cleanup;
+  if (is_multiscript) {
+    if (!generate_multiscript_content(doc, &content, err)) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+  } else {
+    if (!generate_script_content(doc, &content, err)) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
   }
 
-  // Write to file
+  // Write main .anm2 file
   if (!ovl_file_create(path, &file, err)) {
     OV_ERROR_ADD_TRACE(err);
     goto cleanup;
@@ -3645,6 +3945,62 @@ bool ptk_anm2_save(struct ptk_anm2 *doc, wchar_t const *path, struct ov_error *c
     }
   }
 
+  ovl_file_close(file);
+  file = NULL;
+
+  // For multiscript mode, also generate and save .obj2 file
+  if (is_multiscript) {
+    // Create .obj2 path by changing extension
+    // @foo.ptk.anm2 -> @foo.ptk.obj2
+    {
+      size_t const path_len = wcslen(path);
+      // Check for .anm2 extension
+      if (path_len > 5 && wcscmp(path + path_len - 5, L".anm2") == 0) {
+        if (!OV_ARRAY_GROW(&obj2_path, path_len + 1)) {
+          OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+          goto cleanup;
+        }
+        wcscpy(obj2_path, path);
+        // Replace .anm2 with .obj2
+        wcscpy(obj2_path + path_len - 5, L".obj2");
+        OV_ARRAY_SET_LENGTH(obj2_path, path_len + 1);
+      } else {
+        // If not .anm2, just append .obj2
+        if (!OV_ARRAY_GROW(&obj2_path, path_len + 6)) {
+          OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+          goto cleanup;
+        }
+        wcscpy(obj2_path, path);
+        wcscat(obj2_path, L".obj2");
+        OV_ARRAY_SET_LENGTH(obj2_path, path_len + 6);
+      }
+    }
+
+    // Generate .obj2 content
+    if (!generate_obj2_content(doc, &obj2_content, err)) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+
+    // Write .obj2 file
+    if (!ovl_file_create(obj2_path, &file, err)) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+
+    {
+      size_t const obj2_len = OV_ARRAY_LENGTH(obj2_content);
+      size_t bytes_written = 0;
+      if (!ovl_file_write(file, obj2_content, obj2_len, &bytes_written, err)) {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+    }
+
+    ovl_file_close(file);
+    file = NULL;
+  }
+
   // Clear modified flag on successful save
   doc->modified = false;
   notify_state(doc);
@@ -3657,6 +4013,12 @@ cleanup:
   }
   if (content) {
     OV_ARRAY_DESTROY(&content);
+  }
+  if (obj2_content) {
+    OV_ARRAY_DESTROY(&obj2_content);
+  }
+  if (obj2_path) {
+    OV_ARRAY_DESTROY(&obj2_path);
   }
   return success;
 }

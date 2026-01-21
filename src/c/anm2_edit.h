@@ -142,12 +142,15 @@ NODISCARD bool ptk_anm2_edit_set_psd_path(struct ptk_anm2_edit *edit, char const
 NODISCARD bool
 ptk_anm2_edit_set_exclusive_support_default(struct ptk_anm2_edit *edit, bool value, struct ov_error *err);
 NODISCARD bool ptk_anm2_edit_set_information(struct ptk_anm2_edit *edit, char const *info, struct ov_error *err);
+NODISCARD bool
+ptk_anm2_edit_set_default_character_id(struct ptk_anm2_edit *edit, char const *char_id, struct ov_error *err);
 
 // Document metadata
 char const *ptk_anm2_edit_get_label(struct ptk_anm2_edit const *edit);
 char const *ptk_anm2_edit_get_information(struct ptk_anm2_edit const *edit);
 char const *ptk_anm2_edit_get_psd_path(struct ptk_anm2_edit const *edit);
 bool ptk_anm2_edit_get_exclusive_support_default(struct ptk_anm2_edit const *edit);
+char const *ptk_anm2_edit_get_default_character_id(struct ptk_anm2_edit const *edit);
 
 // Selector/item counts and IDs
 size_t ptk_anm2_edit_selector_count(struct ptk_anm2_edit const *edit);
