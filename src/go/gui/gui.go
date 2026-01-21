@@ -325,7 +325,6 @@ func (g *GUI) update() {
 	if sidePaneWidthDip > maxSideDip {
 		sidePaneWidthDip = maxSideDip
 	}
-	g.sidePaneWidthDip = sidePaneWidthDip
 
 	sidePaneWidth := sidePaneWidthDip * scale
 	topPaneHeight := float32(28) * scale
