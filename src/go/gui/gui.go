@@ -69,6 +69,9 @@ type GUI struct {
 	splitterDragging      bool
 	splitterStartMouseX   int32
 	splitterStartWidthDip float32
+	lastSelectedIndex     int            // Track last selected index for view state management
+	lastSplitterWidth     float32        // Track last snapshot splitter width to detect changes
+	lastViewState         *img.ViewState // Cache last saved view state to avoid redundant updates
 
 	SendEditingImageState func(path, state string) error
 	ExportFaviewSlider    func(path, sliderName string, names, values []string, selectedIndex int) error
@@ -85,7 +88,8 @@ func New(ed *editing.Editing) *GUI {
 		editing:    ed,
 		thumbCache: NewThumbnailCache(),
 
-		sidePaneWidthDip: 360,
+		sidePaneWidthDip:  360,
+		lastSelectedIndex: -1,
 	}
 
 	// Set up change notification
@@ -103,13 +107,68 @@ func New(ed *editing.Editing) *GUI {
 // Only trigger changeSelectedImage if the actual selected image changed,
 // not just for thumbnail updates which would cause an infinite loop.
 func (g *GUI) onSnapshotChange() {
+	// Restore splitter width from snapshot if it changed (e.g., after deserialize)
+	// Skip if currently dragging
+	if !g.splitterDragging && g.snapshot.SplitterWidth > 0 && g.snapshot.SplitterWidth != g.lastSplitterWidth {
+		g.sidePaneWidthDip = g.snapshot.SplitterWidth
+		g.lastSplitterWidth = g.snapshot.SplitterWidth
+	}
+
 	var currentImg *img.Image
 	if g.snapshot.SelectedIndex >= 0 && g.snapshot.SelectedIndex < len(g.snapshot.Items) {
 		currentImg = g.snapshot.Items[g.snapshot.SelectedIndex].Image
 	}
 	if currentImg != g.lastSelectedImg {
+		// Save view state of previous image before switching
+		g.saveCurrentViewState()
+
 		g.lastSelectedImg = currentImg
+		g.lastSelectedIndex = g.snapshot.SelectedIndex
+		g.lastViewState = nil // Reset cache for new image
 		g.changeSelectedImage()
+
+		// Restore view state of new image
+		g.restoreViewState()
+	}
+}
+
+// saveCurrentViewState saves the current view state to the editing layer.
+func (g *GUI) saveCurrentViewState() {
+	if g.lastSelectedIndex < 0 || g.mainView == nil {
+		return
+	}
+	zoom, scrollX, scrollY := g.mainView.GetViewState()
+	vs := &img.ViewState{
+		Zoom:    zoom,
+		ScrollX: scrollX,
+		ScrollY: scrollY,
+	}
+	// Skip if unchanged
+	if g.lastViewState != nil &&
+		g.lastViewState.Zoom == vs.Zoom &&
+		g.lastViewState.ScrollX == vs.ScrollX &&
+		g.lastViewState.ScrollY == vs.ScrollY {
+		return
+	}
+	g.lastViewState = vs
+	// Use async since this is called from GUI thread
+	g.editing.Requests <- editing.UpdateViewStateReq{
+		Index:     g.lastSelectedIndex,
+		ViewState: vs,
+	}
+}
+
+// restoreViewState restores the view state from the editing layer.
+func (g *GUI) restoreViewState() {
+	if g.snapshot.SelectedIndex < 0 || g.snapshot.SelectedIndex >= len(g.snapshot.Items) {
+		return
+	}
+	if g.mainView == nil {
+		return
+	}
+	item := g.snapshot.Items[g.snapshot.SelectedIndex]
+	if item.ViewState != nil {
+		g.mainView.SetViewState(item.ViewState.Zoom, item.ViewState.ScrollX, item.ViewState.ScrollY)
 	}
 }
 
@@ -433,6 +492,8 @@ func (g *GUI) update() {
 					g.sidePaneWidthDip = w
 				} else {
 					g.splitterDragging = false
+					// Save splitter width to editing layer
+					g.editing.Requests <- editing.SetSplitterWidthReq{Width: g.sidePaneWidthDip}
 				}
 			}
 		}
@@ -476,6 +537,9 @@ func (g *GUI) update() {
 
 	nk.NkStylePopVec2(ctx)
 	nk.NkStylePopVec2(ctx)
+
+	// Save current view state periodically (changes are detected internally)
+	g.saveCurrentViewState()
 
 	g.window.Render()
 }
@@ -531,6 +595,8 @@ func (g *GUI) GetWindowHandle() (uintptr, error) {
 }
 
 // Serialize serializes the editing state (called from IPC thread).
+// Note: Current view state is saved by onSnapshotChange when selection changes.
+// Splitter width is saved when drag completes.
 func (g *GUI) Serialize() (string, error) {
 	return g.editing.Serialize()
 }

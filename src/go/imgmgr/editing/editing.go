@@ -87,12 +87,14 @@ type Item struct {
 	Tag         int
 	LatestState string
 	Thumbnail   *image.NRGBA
+	ViewState   *img.ViewState // View settings (zoom, scroll) for this image
 }
 
 // Snapshot is a read-only copy of the editing state for GUI consumption.
 type Snapshot struct {
 	Items         []Item
 	SelectedIndex int
+	SplitterWidth float32 // 0 means not set (use default)
 }
 
 // Editing manages the list of images being edited.
@@ -104,6 +106,9 @@ type Editing struct {
 	// Internal state (only accessed by Run goroutine)
 	images        []Item
 	selectedIndex int
+
+	// GUI global settings
+	SplitterWidth float32 // Splitter position in DIP
 
 	// Requests is the channel for receiving requests.
 	// Use a buffered channel to avoid blocking callers.
@@ -196,6 +201,18 @@ func (ed *Editing) handle(req any) {
 			ed.images[r.Index].Thumbnail = r.Thumbnail
 			ed.notifyChange()
 		}
+
+	case UpdateViewStateReq:
+		if r.Index >= 0 && r.Index < len(ed.images) {
+			ed.images[r.Index].ViewState = r.ViewState
+			// No need to notify change for view state updates
+		}
+
+	case SetSplitterWidthReq:
+		ed.SplitterWidth = r.Width
+
+	case GetSplitterWidthReq:
+		r.Reply <- ed.SplitterWidth
 	}
 }
 
@@ -211,6 +228,7 @@ func (ed *Editing) makeSnapshot() Snapshot {
 	return Snapshot{
 		Items:         items,
 		SelectedIndex: ed.selectedIndex,
+		SplitterWidth: ed.SplitterWidth,
 	}
 }
 
@@ -280,14 +298,24 @@ func (ed *Editing) getSelectedImage() GetSelectedImageResp {
 	}
 }
 
+// serializeData holds per-image serialization data
 type serializeData struct {
 	Image     *img.ProjectState
 	Tag       int
 	Thumbnail []byte
 }
 
+// serializeRoot is the new root structure for serialization
+// Version 0 or missing: legacy format ([]serializeData)
+// Version 1: new format with global settings
+type serializeRoot struct {
+	Version       int             `json:"version"`
+	SplitterWidth float32         `json:"splitterWidth,omitempty"`
+	Images        []serializeData `json:"images"`
+}
+
 func (ed *Editing) serialize() (string, error) {
-	var srz []serializeData
+	var images []serializeData
 	for _, item := range ed.images {
 		var thumb []byte
 		if item.Thumbnail != nil {
@@ -296,14 +324,24 @@ func (ed *Editing) serialize() (string, error) {
 				thumb = b.Bytes()
 			}
 		}
-		srz = append(srz, serializeData{
-			Image:     item.Image.SerializeProject(),
+		ps := item.Image.SerializeProject()
+		// Include view state if available
+		ps.ViewState = item.ViewState
+		images = append(images, serializeData{
+			Image:     ps,
 			Tag:       item.Tag,
 			Thumbnail: thumb,
 		})
 	}
+
+	root := serializeRoot{
+		Version:       1,
+		SplitterWidth: ed.SplitterWidth,
+		Images:        images,
+	}
+
 	b := bytes.NewBufferString("")
-	if err := json.NewEncoder(b).Encode(srz); err != nil {
+	if err := json.NewEncoder(b).Encode(root); err != nil {
 		return "", err
 	}
 	return b.String(), nil
@@ -315,9 +353,26 @@ func (ed *Editing) deserialize(state string) error {
 		return nil
 	}
 
-	var srz []serializeData
-	if err := json.NewDecoder(bytes.NewReader([]byte(state))).Decode(&srz); err != nil {
+	// Try to decode as new format first
+	var root serializeRoot
+	decoder := json.NewDecoder(bytes.NewReader([]byte(state)))
+	if err := decoder.Decode(&root); err != nil {
 		return err
+	}
+
+	// Check if this is the new format (has version field)
+	var srz []serializeData
+	if root.Version >= 1 {
+		// New format
+		srz = root.Images
+		ed.SplitterWidth = root.SplitterWidth
+	} else {
+		// Legacy format: the JSON is an array, not an object
+		// Re-decode as legacy format
+		if err := json.NewDecoder(bytes.NewReader([]byte(state))).Decode(&srz); err != nil {
+			return err
+		}
+		// Keep current splitter width for legacy data
 	}
 
 	if len(srz) > limit {
@@ -338,6 +393,7 @@ func (ed *Editing) deserialize(state string) error {
 			DisplayName: filepath.Base(*img.FilePath),
 			Image:       img,
 			Tag:         d.Tag,
+			ViewState:   d.Image.ViewState, // Restore view state (may be nil for old data)
 		}
 
 		if len(d.Thumbnail) > 0 {

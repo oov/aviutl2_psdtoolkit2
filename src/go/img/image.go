@@ -164,11 +164,20 @@ func (img *Image) Deserialize(s string) (bool, error) {
 }
 
 // TODO: faview selected item state
+
+// ViewState holds per-image view settings for restoration
+type ViewState struct {
+	Zoom    float64 `json:"zoom,omitempty"`
+	ScrollX float64 `json:"scrollX,omitempty"` // Relative position 0.0-1.0
+	ScrollY float64 `json:"scrollY,omitempty"` // Relative position 0.0-1.0
+}
+
 type ProjectState struct {
-	Version  int
-	FilePath string
-	Layer    map[string]SerializedData
-	PFV      PFVSerializedData
+	Version   int
+	FilePath  string
+	Layer     map[string]SerializedData
+	PFV       PFVSerializedData
+	ViewState *ViewState `json:"viewState,omitempty"` // May be nil for old data
 }
 
 func (img *Image) SerializeProject() *ProjectState {

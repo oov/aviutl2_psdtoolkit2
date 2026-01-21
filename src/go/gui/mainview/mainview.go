@@ -31,6 +31,10 @@ type MainView struct {
 	forceUpdate      bool
 	forceFitToWindow bool
 
+	// pendingViewState holds the view state to restore (set by SetViewState, applied in SetRenderedImage)
+	// Using optional pattern instead of flags for cleaner state management
+	pendingViewState *pendingState
+
 	minZoom  float32
 	maxZoom  float32
 	stepZoom float32
@@ -38,6 +42,13 @@ type MainView struct {
 	zooming  bool
 
 	queue chan func()
+}
+
+// pendingState holds view state waiting to be applied (scroll positions are relative 0.0-1.0)
+type pendingState struct {
+	zoom    float64
+	scrollX float64
+	scrollY float64
 }
 
 var jq = jobqueue.New(1)
@@ -77,6 +88,29 @@ func (mv *MainView) SetZoomRange(min, max, step float32) {
 	mv.stepZoom = step
 }
 
+// GetViewState returns the current view state (zoom and relative scroll positions)
+// ScrollX/ScrollY are normalized to 0.0-1.0 range relative to the image rect
+func (mv *MainView) GetViewState() (zoom, scrollX, scrollY float64) {
+	if mv.latestImageRect.Empty() {
+		return mv.zoom, 0.5, 0.5
+	}
+	winWidth := (mv.latestWorkspaceSize.X - mv.latestImageRect.Dx()) / 2
+	winHeight := (mv.latestWorkspaceSize.Y - mv.latestImageRect.Dy()) / 2
+	x := (float64(mv.scrollX) - float64(winWidth)*0.5) / float64(mv.latestImageRect.Dx())
+	y := (float64(mv.scrollY) - float64(winHeight)*0.5) / float64(mv.latestImageRect.Dy())
+	return mv.zoom, x, y
+}
+
+// SetViewState queues a view state restoration (applied in SetRenderedImage)
+// ScrollX/ScrollY should be normalized 0.0-1.0 values
+func (mv *MainView) SetViewState(zoom, scrollX, scrollY float64) {
+	mv.pendingViewState = &pendingState{
+		zoom:    zoom,
+		scrollX: scrollX,
+		scrollY: scrollY,
+	}
+}
+
 func (mv *MainView) adjustZoom(imageRect image.Rectangle) {
 	latestActiveRect := mv.latestActiveRect
 	// If activeRect is empty, it can not be processed correctly.
@@ -97,9 +131,17 @@ func (mv *MainView) adjustZoom(imageRect image.Rectangle) {
 
 func (mv *MainView) SetRenderedImage(img *image.NRGBA) {
 	mv.renderedImage = img
-	if mv.resizedImage == nil {
+
+	// Pending view state will be applied in renderCanvas where we have workspace dimensions
+	if mv.pendingViewState != nil {
+		mv.zoom = mv.pendingViewState.zoom
+		mv.forceUpdate = true
+		// Keep pendingViewState for scroll position restoration in renderCanvas
+	} else if mv.resizedImage == nil {
+		// Only auto-adjust zoom for fresh images without pending state
 		mv.adjustZoom(img.Rect)
 	}
+
 	mv.updateViewImage(vrmFastAfterBeautiful)
 }
 
@@ -196,14 +238,21 @@ func (mv *MainView) renderCanvas(ctx *nk.Context) {
 		winHeight*2+imageRect.Dy(),
 	)
 
-	if !workspaceSize.Eq(mv.latestWorkspaceSize) || forceFitToWindow {
+	// Apply pending view state if exists (convert relative scroll to absolute)
+	if ps := mv.pendingViewState; ps != nil {
+		mv.scrollX = nk.Uint(math.Floor(0.5 + float64(imageRect.Dx())*ps.scrollX + float64(winWidth)*0.5))
+		mv.scrollY = nk.Uint(math.Floor(0.5 + float64(imageRect.Dy())*ps.scrollY + float64(winHeight)*0.5))
+		mv.pendingViewState = nil
+	} else if !workspaceSize.Eq(mv.latestWorkspaceSize) || forceFitToWindow {
 		latestWinWidth := (mv.latestWorkspaceSize.X - mv.latestImageRect.Dx()) / 2
 		latestWinHeight := (mv.latestWorkspaceSize.Y - mv.latestImageRect.Dy()) / 2
 		var x, y float64
-		if forceFitToWindow {
+		if forceFitToWindow || mv.latestImageRect.Empty() {
+			// Center the view for fit-to-window or initial display
 			x = 0.5
 			y = 0.5
 		} else {
+			// Maintain relative scroll position
 			x = (float64(mv.scrollX) - float64(latestWinWidth)*0.5) / float64(mv.latestImageRect.Dx())
 			y = (float64(mv.scrollY) - float64(latestWinHeight)*0.5) / float64(mv.latestImageRect.Dy())
 		}

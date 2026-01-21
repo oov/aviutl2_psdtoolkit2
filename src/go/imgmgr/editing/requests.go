@@ -97,3 +97,19 @@ type UpdateThumbnailReq struct {
 	Index     int
 	Thumbnail *image.NRGBA
 }
+
+// UpdateViewStateReq requests to update the view state for an item.
+type UpdateViewStateReq struct {
+	Index     int
+	ViewState *img.ViewState
+}
+
+// SetSplitterWidthReq requests to set the splitter width.
+type SetSplitterWidthReq struct {
+	Width float32
+}
+
+// GetSplitterWidthReq requests to get the splitter width.
+type GetSplitterWidthReq struct {
+	Reply chan<- float32
+}
