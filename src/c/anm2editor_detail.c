@@ -32,6 +32,9 @@ struct anm2editor_detail {
   WNDPROC edit_oldproc;  // Original window procedure for edit control
   bool edit_committing;  // Reentrancy guard for commit/cancel
   bool edit_adding_new;  // True if editing a new parameter (not yet added)
+
+  // Selection restoration after refresh (e.g., undo/redo)
+  int saved_selection; // -1 if no saved selection
 };
 
 /**
@@ -44,39 +47,6 @@ static void report_error(struct anm2editor_detail *detail, struct ov_error *err)
     ptk_logf_error(err, "%1$hs", "%1$hs", gettext("failed to perform detail operation."));
     OV_ERROR_DESTROY(err);
   }
-}
-
-/**
- * @brief Delete a parameter row by its row index
- */
-static void delete_param_row(struct anm2editor_detail *detail, size_t row_index) {
-  if (!detail || !detail->edit) {
-    return;
-  }
-  struct anm2editor_detail_row const *row_info = anm2editor_detail_get_row(detail, row_index);
-  if (!row_info || !anm2editor_detail_row_type_is_deletable_param(row_info->type)) {
-    return;
-  }
-  struct ov_error err = {0};
-  if (!ptk_anm2_edit_param_remove(detail->edit, row_info->param_id, &err)) {
-    OV_ERROR_ADD_TRACE(&err);
-    report_error(detail, &err);
-  }
-}
-
-/**
- * @brief Check if adding new parameter is allowed
- */
-static bool can_add_new_param(struct anm2editor_detail *detail) {
-  if (!detail || !detail->edit) {
-    return false;
-  }
-  struct ptk_anm2_edit_state state = {0};
-  ptk_anm2_edit_get_state(detail->edit, &state);
-  if (state.focus_type != ptk_anm2_edit_focus_item) {
-    return false;
-  }
-  return ptk_anm2_edit_item_is_animation(detail->edit, state.focus_id);
 }
 
 static void rows_clear(struct anm2editor_detail *detail) {
@@ -139,6 +109,39 @@ static struct anm2editor_detail_row const *rows_get(struct anm2editor_detail con
     return NULL;
   }
   return &detail->rows[index];
+}
+
+/**
+ * @brief Delete a parameter row by its row index
+ */
+static void delete_param_row(struct anm2editor_detail *detail, size_t row_index) {
+  if (!detail || !detail->edit) {
+    return;
+  }
+  struct anm2editor_detail_row const *row_info = rows_get(detail, row_index);
+  if (!row_info || !anm2editor_detail_row_type_is_deletable_param(row_info->type)) {
+    return;
+  }
+  struct ov_error err = {0};
+  if (!ptk_anm2_edit_param_remove(detail->edit, row_info->param_id, &err)) {
+    OV_ERROR_ADD_TRACE(&err);
+    report_error(detail, &err);
+  }
+}
+
+/**
+ * @brief Check if adding new parameter is allowed
+ */
+static bool can_add_new_param(struct anm2editor_detail *detail) {
+  if (!detail || !detail->edit) {
+    return false;
+  }
+  struct ptk_anm2_edit_state state = {0};
+  ptk_anm2_edit_get_state(detail->edit, &state);
+  if (state.focus_type != ptk_anm2_edit_focus_item) {
+    return false;
+  }
+  return ptk_anm2_edit_item_is_animation(detail->edit, state.focus_id);
 }
 
 static size_t rows_find_by_type(struct anm2editor_detail const *detail, enum anm2editor_detail_row_type type) {
@@ -459,6 +462,7 @@ struct anm2editor_detail *anm2editor_detail_create(void *parent_window,
       .edit = edit,
       .edit_row = -1,
       .edit_column = -1,
+      .saved_selection = -1,
   };
 
   if (callbacks) {
@@ -560,6 +564,229 @@ void anm2editor_detail_clear(struct anm2editor_detail *detail) {
   cancel_edit_internal(detail);
   SendMessageW(detail->listview, LVM_DELETEALLITEMS, 0, 0);
   rows_clear(detail);
+}
+
+// Internal helper to populate detail for multi-selection mode
+static bool refresh_multisel(struct anm2editor_detail *detail, struct ov_error *const err) {
+  bool success = false;
+
+  // Iterate through tree in order to collect selected value items
+  size_t const sel_count = ptk_anm2_edit_selector_count(detail->edit);
+  for (size_t sel_idx = 0; sel_idx < sel_count; sel_idx++) {
+    uint32_t const sel_id = ptk_anm2_edit_selector_get_id(detail->edit, sel_idx);
+    size_t const item_count = ptk_anm2_edit_item_count(detail->edit, sel_id);
+    for (size_t item_idx = 0; item_idx < item_count; item_idx++) {
+      uint32_t const id = ptk_anm2_edit_item_get_id(detail->edit, sel_idx, item_idx);
+      if (!ptk_anm2_edit_is_item_selected(detail->edit, id)) {
+        continue;
+      }
+      if (ptk_anm2_edit_item_is_animation(detail->edit, id)) {
+        continue;
+      }
+      char const *name = ptk_anm2_edit_item_get_name(detail->edit, id);
+      char const *value = ptk_anm2_edit_item_get_value(detail->edit, id);
+      if (!anm2editor_detail_add_row(detail,
+                                     name,
+                                     value,
+                                     &(struct anm2editor_detail_row){
+                                         .type = anm2editor_detail_row_type_multisel_item,
+                                         .item_id = id,
+                                     },
+                                     err)) {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+    }
+  }
+
+  success = true;
+
+cleanup:
+  return success;
+}
+
+// Internal helper to populate detail for document properties
+static bool refresh_document(struct anm2editor_detail *detail, struct ov_error *const err) {
+  bool success = false;
+
+  if (!anm2editor_detail_add_row(detail,
+                                 pgettext("anm2editor", "Label"),
+                                 ptk_anm2_edit_get_label(detail->edit),
+                                 &(struct anm2editor_detail_row){.type = anm2editor_detail_row_type_label},
+                                 err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
+  if (!anm2editor_detail_add_row(detail,
+                                 pgettext("anm2editor", "Information"),
+                                 ptk_anm2_edit_get_information(detail->edit),
+                                 &(struct anm2editor_detail_row){.type = anm2editor_detail_row_type_information},
+                                 err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
+  if (!anm2editor_detail_add_row(detail,
+                                 pgettext("anm2editor", "PSD File Path"),
+                                 ptk_anm2_edit_get_psd_path(detail->edit),
+                                 &(struct anm2editor_detail_row){.type = anm2editor_detail_row_type_psd_path},
+                                 err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
+  if (!anm2editor_detail_add_row(
+          detail,
+          pgettext("anm2editor", "Exclusive Support Default"),
+          ptk_anm2_edit_get_exclusive_support_default(detail->edit) ? "1" : "",
+          &(struct anm2editor_detail_row){.type = anm2editor_detail_row_type_exclusive_support_default},
+          err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
+  if (!anm2editor_detail_add_row(
+          detail,
+          pgettext("anm2editor", "Default Character ID"),
+          ptk_anm2_edit_get_default_character_id(detail->edit),
+          &(struct anm2editor_detail_row){.type = anm2editor_detail_row_type_default_character_id},
+          err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
+  success = true;
+
+cleanup:
+  return success;
+}
+
+// Internal helper to populate detail for single item selection
+static bool refresh_item(struct anm2editor_detail *detail, uint32_t item_id, struct ov_error *const err) {
+  if (item_id == 0) {
+    return true;
+  }
+
+  bool success = false;
+  uint32_t *param_ids = NULL;
+
+  bool const is_animation = ptk_anm2_edit_item_is_animation(detail->edit, item_id);
+  if (is_animation) {
+    param_ids = ptk_anm2_get_param_ids(ptk_anm2_edit_get_doc(detail->edit), item_id, err);
+    if (!param_ids) {
+      // Empty params is not an error
+      if (ptk_anm2_edit_param_count(detail->edit, item_id) == 0) {
+        OV_ERROR_DESTROY(err);
+      } else {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+    }
+    size_t const num_params = param_ids ? OV_ARRAY_LENGTH(param_ids) : 0;
+    for (size_t i = 0; i < num_params; i++) {
+      uint32_t const pid = param_ids[i];
+      char const *key = ptk_anm2_edit_param_get_key(detail->edit, pid);
+      char const *value = ptk_anm2_edit_param_get_value(detail->edit, pid);
+      if (!anm2editor_detail_add_row(detail,
+                                     key,
+                                     value,
+                                     &(struct anm2editor_detail_row){
+                                         .type = anm2editor_detail_row_type_animation_param,
+                                         .param_id = pid,
+                                     },
+                                     err)) {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+    }
+    if (!anm2editor_detail_add_row(detail,
+                                   pgettext("anm2editor", "(Add new...)"),
+                                   "",
+                                   &(struct anm2editor_detail_row){.type = anm2editor_detail_row_type_placeholder},
+                                   err)) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+  } else {
+    char const *name = ptk_anm2_edit_item_get_name(detail->edit, item_id);
+    char const *value = ptk_anm2_edit_item_get_value(detail->edit, item_id);
+    if (!anm2editor_detail_add_row(
+            detail, name, value, &(struct anm2editor_detail_row){.type = anm2editor_detail_row_type_value_item}, err)) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+  }
+
+  success = true;
+
+cleanup:
+  if (param_ids) {
+    OV_ARRAY_DESTROY(&param_ids);
+  }
+  return success;
+}
+
+void anm2editor_detail_refresh(struct anm2editor_detail *detail) {
+  if (!detail || !detail->edit) {
+    return;
+  }
+
+  struct ov_error err = {0};
+  bool success = false;
+
+  anm2editor_detail_clear(detail);
+
+  // Check selection count
+  size_t multisel_count = 0;
+  ptk_anm2_edit_get_selected_item_ids(detail->edit, &multisel_count);
+
+  if (multisel_count > 1) {
+    if (!refresh_multisel(detail, &err)) {
+      OV_ERROR_ADD_TRACE(&err);
+      goto cleanup;
+    }
+  } else {
+    // Get focus state
+    struct ptk_anm2_edit_state state = {0};
+    ptk_anm2_edit_get_state(detail->edit, &state);
+
+    if (state.focus_type == ptk_anm2_edit_focus_item) {
+      if (!refresh_item(detail, state.focus_id, &err)) {
+        OV_ERROR_ADD_TRACE(&err);
+        goto cleanup;
+      }
+    } else {
+      // No selection or selector selection - show document properties
+      if (!refresh_document(detail, &err)) {
+        OV_ERROR_ADD_TRACE(&err);
+        goto cleanup;
+      }
+    }
+  }
+
+  success = true;
+
+cleanup:
+  if (!success) {
+    ptk_logf_error(&err, "%1$hs", "%1$hs", gettext("failed to update detail list."));
+    OV_ERROR_DESTROY(&err);
+  }
+
+  // Restore saved selection if any
+  if (detail->saved_selection >= 0 && detail->listview) {
+    int const item_count = (int)SendMessageW(detail->listview, LVM_GETITEMCOUNT, 0, 0);
+    if (detail->saved_selection < item_count) {
+      SendMessageW(detail->listview,
+                   LVM_SETITEMSTATE,
+                   (WPARAM)detail->saved_selection,
+                   (LPARAM) & (LVITEMW){
+                                  .stateMask = LVIS_SELECTED | LVIS_FOCUSED,
+                                  .state = LVIS_SELECTED | LVIS_FOCUSED,
+                              });
+    }
+    detail->saved_selection = -1;
+  }
 }
 
 bool anm2editor_detail_add_row(struct anm2editor_detail *detail,
@@ -686,14 +913,6 @@ void anm2editor_detail_remove_row(struct anm2editor_detail *detail, size_t row_i
 
   // Update lParam for all rows after the removed one
   listview_update_row_lparam(detail->listview, (int)row_index);
-}
-
-struct anm2editor_detail_row const *anm2editor_detail_get_row(struct anm2editor_detail const *detail,
-                                                              size_t row_index) {
-  if (!detail) {
-    return NULL;
-  }
-  return rows_get(detail, row_index);
 }
 
 size_t anm2editor_detail_row_count(struct anm2editor_detail const *detail) {
@@ -919,7 +1138,7 @@ intptr_t anm2editor_detail_handle_notify(struct anm2editor_detail *detail, void 
       };
       SendMessageW(detail->listview, LVM_GETITEMW, 0, (LPARAM)&lvi);
 
-      struct anm2editor_detail_row const *row_info = anm2editor_detail_get_row(detail, (size_t)lvi.lParam);
+      struct anm2editor_detail_row const *row_info = rows_get(detail, (size_t)lvi.lParam);
       if (row_info) {
         if (row_info->type == anm2editor_detail_row_type_placeholder) {
           // Placeholder row - check if adding new parameter is allowed
@@ -986,7 +1205,7 @@ intptr_t anm2editor_detail_handle_notify(struct anm2editor_detail *detail, void 
       };
       SendMessageW(detail->listview, LVM_GETITEMW, 0, (LPARAM)&lvi);
 
-      struct anm2editor_detail_row const *row_info = anm2editor_detail_get_row(detail, (size_t)lvi.lParam);
+      struct anm2editor_detail_row const *row_info = rows_get(detail, (size_t)lvi.lParam);
       if (row_info && anm2editor_detail_row_type_is_deletable_param(row_info->type)) {
         // Show context menu
         HMENU hMenu = CreatePopupMenu();
@@ -1015,5 +1234,42 @@ intptr_t anm2editor_detail_handle_notify(struct anm2editor_detail *detail, void 
 
   default:
     return 0;
+  }
+}
+
+void anm2editor_detail_handle_view_event(struct anm2editor_detail *detail,
+                                         struct ptk_anm2_edit_view_event const *event) {
+  if (!detail || !event) {
+    return;
+  }
+
+  switch (event->op) {
+  case ptk_anm2_edit_view_before_undo_redo:
+    // Save selection for restoration after refresh
+    if (detail->listview) {
+      detail->saved_selection = (int)SendMessageW(detail->listview, LVM_GETNEXTITEM, (WPARAM)-1, LVNI_SELECTED);
+    }
+    break;
+
+  case ptk_anm2_edit_view_detail_refresh:
+    anm2editor_detail_refresh(detail);
+    break;
+
+  case ptk_anm2_edit_view_treeview_rebuild:
+  case ptk_anm2_edit_view_treeview_insert_selector:
+  case ptk_anm2_edit_view_treeview_remove_selector:
+  case ptk_anm2_edit_view_treeview_update_selector:
+  case ptk_anm2_edit_view_treeview_move_selector:
+  case ptk_anm2_edit_view_treeview_insert_item:
+  case ptk_anm2_edit_view_treeview_remove_item:
+  case ptk_anm2_edit_view_treeview_update_item:
+  case ptk_anm2_edit_view_treeview_move_item:
+  case ptk_anm2_edit_view_treeview_select:
+  case ptk_anm2_edit_view_treeview_set_focus:
+  case ptk_anm2_edit_view_undo_redo_state_changed:
+  case ptk_anm2_edit_view_modified_state_changed:
+  case ptk_anm2_edit_view_save_state_changed:
+    // Non-detail events - handled by parent
+    break;
   }
 }

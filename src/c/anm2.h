@@ -116,7 +116,7 @@ void ptk_anm2_set_state_callback(struct ptk_anm2 *doc, ptk_anm2_state_callback c
  * @param err Error information
  * @return New document handle on success, NULL on failure
  */
-NODISCARD struct ptk_anm2 *ptk_anm2_new(struct ov_error *const err);
+NODISCARD struct ptk_anm2 *ptk_anm2_create(struct ov_error *const err);
 
 /**
  * @brief Destroy an anm2 document and free all resources
@@ -744,6 +744,41 @@ uint32_t ptk_anm2_item_get_id(struct ptk_anm2 const *doc, size_t sel_idx, size_t
  * @return Unique ID, 0 if indices are invalid
  */
 uint32_t ptk_anm2_param_get_id(struct ptk_anm2 const *doc, size_t sel_idx, size_t item_idx, size_t param_idx);
+
+/**
+ * @brief Get all item IDs for a selector
+ *
+ * Returns an array of item IDs belonging to the specified selector.
+ * Caller must free the returned array with OV_ARRAY_DESTROY.
+ *
+ * @param doc Document handle
+ * @param selector_id Selector ID
+ * @param err Error information on failure
+ * @return Array of item IDs (ovarray), or NULL on failure
+ */
+NODISCARD uint32_t *ptk_anm2_get_item_ids(struct ptk_anm2 const *doc, uint32_t selector_id, struct ov_error *err);
+
+/**
+ * @brief Get all parameter IDs for an item
+ *
+ * Returns an array of parameter IDs belonging to the specified item.
+ * Caller must free the returned array with OV_ARRAY_DESTROY.
+ *
+ * @param doc Document handle
+ * @param item_id Item ID
+ * @param err Error information on failure
+ * @return Array of parameter IDs (ovarray), or NULL on failure
+ */
+NODISCARD uint32_t *ptk_anm2_get_param_ids(struct ptk_anm2 const *doc, uint32_t item_id, struct ov_error *err);
+
+/**
+ * @brief Get the item ID that contains a parameter
+ *
+ * @param doc Document handle
+ * @param param_id Parameter ID
+ * @return Item ID, 0 if parameter ID is invalid
+ */
+uint32_t ptk_anm2_param_get_item_id(struct ptk_anm2 const *doc, uint32_t param_id);
 
 /**
  * @brief Get the userdata of a selector by ID

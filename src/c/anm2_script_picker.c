@@ -19,9 +19,6 @@
 #include "dialog.h"
 #include "win32.h"
 
-// Forward declaration for DLL module lookup
-extern bool ovl_os_get_hinstance_from_fnptr(void *fn, void **hinstance, struct ov_error *err);
-
 // Dialog control IDs
 enum {
   id_label = 101,

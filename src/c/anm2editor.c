@@ -82,9 +82,6 @@ struct ptk_anm2editor {
   struct anm2editor_detail *detail;
   struct anm2editor_treeview *treeview;
   struct anm2editor_splitter *splitter;
-
-  // State tracking for detail ListView selection restoration after UNDO/REDO
-  int detail_restore_sel;
 };
 
 // Get the Script directory path (DLL/../Script/)
@@ -200,236 +197,48 @@ static void update_window_title(struct ptk_anm2editor *editor) {
   SetWindowTextW(editor->window, title);
 }
 
-// Update focus tracking based on document changes
-// Get the currently selected item's indices
+// Get the currently selected item's IDs
 // Returns: 0 = nothing selected, 1 = selector selected, 2 = item selected
-static int get_selected_indices(struct ptk_anm2editor *editor, size_t *selector_idx, size_t *item_idx) {
-  struct anm2editor_treeview_item_info info = {0};
-  if (!anm2editor_treeview_get_selected(editor->treeview, &info)) {
-    return 0;
-  }
+static int get_selected_ids(struct ptk_anm2editor *editor, uint32_t *selector_id, uint32_t *item_id) {
+  struct ptk_anm2_edit_state state = {0};
+  ptk_anm2_edit_get_state(editor->edit_core, &state);
 
-  if (info.is_selector) {
-    if (ptk_anm2_edit_find_selector(editor->edit_core, info.id, selector_idx)) {
-      return 1;
-    }
+  switch (state.focus_type) {
+  case ptk_anm2_edit_focus_none:
     return 0;
-  } else {
-    if (ptk_anm2_edit_find_item(editor->edit_core, info.id, selector_idx, item_idx)) {
+  case ptk_anm2_edit_focus_selector:
+    *selector_id = state.focus_id;
+    return 1;
+  case ptk_anm2_edit_focus_item: {
+    size_t sel_idx = 0;
+    size_t item_idx = 0;
+    if (ptk_anm2_edit_find_item(editor->edit_core, state.focus_id, &sel_idx, &item_idx)) {
+      *selector_id = ptk_anm2_edit_selector_get_id(editor->edit_core, sel_idx);
+      *item_id = state.focus_id;
       return 2;
     }
     return 0;
   }
+  }
+  return 0;
 }
 
-// Populate detail pane for multi-selection mode
-// Shows value items in tree view order (ignores animation items)
-static bool update_detail_multisel(struct ptk_anm2editor *editor, struct ov_error *const err) {
-  bool success = false;
-
-  {
-    // Iterate through tree in order to collect selected value items
-    size_t const sel_count = ptk_anm2_edit_selector_count(editor->edit_core);
-    for (size_t sel_idx = 0; sel_idx < sel_count; sel_idx++) {
-      uint32_t const sel_id = ptk_anm2_edit_selector_get_id(editor->edit_core, sel_idx);
-      size_t const item_count = ptk_anm2_edit_item_count(editor->edit_core, sel_id);
-      for (size_t item_idx = 0; item_idx < item_count; item_idx++) {
-        uint32_t const id = ptk_anm2_edit_item_get_id(editor->edit_core, sel_idx, item_idx);
-        // Use edit_core to check selection instead of TreeView directly
-        if (!editor->edit_core || !ptk_anm2_edit_is_item_selected(editor->edit_core, id)) {
-          continue;
-        }
-        if (ptk_anm2_edit_item_is_animation(editor->edit_core, id)) {
-          continue;
-        }
-        char const *name = ptk_anm2_edit_item_get_name(editor->edit_core, id);
-        char const *value = ptk_anm2_edit_item_get_value(editor->edit_core, id);
-        if (!anm2editor_detail_add_row(editor->detail,
-                                       name,
-                                       value,
-                                       &(struct anm2editor_detail_row){
-                                           .type = anm2editor_detail_row_type_multisel_item,
-                                           .item_id = id,
-                                       },
-                                       err)) {
-          OV_ERROR_ADD_TRACE(err);
-          goto cleanup;
-        }
-      }
-    }
+// Get the selector ID for current selection
+static uint32_t get_selected_selector_id(struct ptk_anm2editor *editor) {
+  if (!editor || !editor->edit_core) {
+    return 0;
   }
 
-  success = true;
+  uint32_t sel_id = 0;
+  uint32_t item_id = 0;
+  int const sel_type = get_selected_ids(editor, &sel_id, &item_id);
 
-cleanup:
-  return success;
-}
-
-// Populate detail pane for no selection or selector selection
-static bool update_detail_document(struct ptk_anm2editor *editor, struct ov_error *const err) {
-  bool success = false;
-
-  {
-    if (!anm2editor_detail_add_row(editor->detail,
-                                   pgettext("anm2editor", "Label"),
-                                   ptk_anm2_edit_get_label(editor->edit_core),
-                                   &(struct anm2editor_detail_row){.type = anm2editor_detail_row_type_label},
-                                   err)) {
-      OV_ERROR_ADD_TRACE(err);
-      goto cleanup;
-    }
-
-    if (!anm2editor_detail_add_row(editor->detail,
-                                   pgettext("anm2editor", "Information"),
-                                   ptk_anm2_edit_get_information(editor->edit_core),
-                                   &(struct anm2editor_detail_row){.type = anm2editor_detail_row_type_information},
-                                   err)) {
-      OV_ERROR_ADD_TRACE(err);
-      goto cleanup;
-    }
-
-    if (!anm2editor_detail_add_row(editor->detail,
-                                   pgettext("anm2editor", "PSD File Path"),
-                                   ptk_anm2_edit_get_psd_path(editor->edit_core),
-                                   &(struct anm2editor_detail_row){.type = anm2editor_detail_row_type_psd_path},
-                                   err)) {
-      OV_ERROR_ADD_TRACE(err);
-      goto cleanup;
-    }
-
-    if (!anm2editor_detail_add_row(
-            editor->detail,
-            pgettext("anm2editor", "Exclusive Support Default"),
-            ptk_anm2_edit_get_exclusive_support_default(editor->edit_core) ? "1" : "",
-            &(struct anm2editor_detail_row){.type = anm2editor_detail_row_type_exclusive_support_default},
-            err)) {
-      OV_ERROR_ADD_TRACE(err);
-      goto cleanup;
-    }
-
-    if (!anm2editor_detail_add_row(
-            editor->detail,
-            pgettext("anm2editor", "Default Character ID"),
-            ptk_anm2_edit_get_default_character_id(editor->edit_core),
-            &(struct anm2editor_detail_row){.type = anm2editor_detail_row_type_default_character_id},
-            err)) {
-      OV_ERROR_ADD_TRACE(err);
-      goto cleanup;
-    }
+  // Return the selector ID if something is selected
+  if (sel_type == 0) {
+    return 0;
   }
 
-  success = true;
-
-cleanup:
-  return success;
-}
-
-// Populate detail pane for single item selection
-static bool
-update_detail_item(struct ptk_anm2editor *editor, size_t sel_idx, size_t item_idx, struct ov_error *const err) {
-  uint32_t const sel_id = ptk_anm2_edit_selector_get_id(editor->edit_core, sel_idx);
-  if (sel_id == 0) {
-    return true;
-  }
-  uint32_t const item_id = ptk_anm2_edit_item_get_id(editor->edit_core, sel_idx, item_idx);
-  if (item_id == 0) {
-    return true;
-  }
-
-  bool success = false;
-
-  {
-    bool const is_animation = ptk_anm2_edit_item_is_animation(editor->edit_core, item_id);
-    if (is_animation) {
-      size_t const num_params = ptk_anm2_edit_param_count(editor->edit_core, item_id);
-      for (size_t i = 0; i < num_params; i++) {
-        uint32_t const pid = ptk_anm2_edit_param_get_id(editor->edit_core, sel_idx, item_idx, i);
-        char const *key = ptk_anm2_edit_param_get_key(editor->edit_core, pid);
-        char const *value = ptk_anm2_edit_param_get_value(editor->edit_core, pid);
-        if (!anm2editor_detail_add_row(editor->detail,
-                                       key,
-                                       value,
-                                       &(struct anm2editor_detail_row){
-                                           .type = anm2editor_detail_row_type_animation_param,
-                                           .param_id = pid,
-                                       },
-                                       err)) {
-          OV_ERROR_ADD_TRACE(err);
-          goto cleanup;
-        }
-      }
-      if (!anm2editor_detail_add_row(editor->detail,
-                                     pgettext("anm2editor", "(Add new...)"),
-                                     "",
-                                     &(struct anm2editor_detail_row){.type = anm2editor_detail_row_type_placeholder},
-                                     err)) {
-        OV_ERROR_ADD_TRACE(err);
-        goto cleanup;
-      }
-    } else {
-      char const *name = ptk_anm2_edit_item_get_name(editor->edit_core, item_id);
-      char const *value = ptk_anm2_edit_item_get_value(editor->edit_core, item_id);
-      if (!anm2editor_detail_add_row(editor->detail,
-                                     name,
-                                     value,
-                                     &(struct anm2editor_detail_row){.type = anm2editor_detail_row_type_value_item},
-                                     err)) {
-        OV_ERROR_ADD_TRACE(err);
-        goto cleanup;
-      }
-    }
-  }
-
-  success = true;
-
-cleanup:
-  return success;
-}
-
-static void update_detail_list(struct ptk_anm2editor *editor) {
-  if (!editor || !editor->detail || !editor->edit_core) {
-    return;
-  }
-
-  struct ov_error err = {0};
-  bool success = false;
-
-  anm2editor_detail_clear(editor->detail);
-
-  // Use edit_core to check selection count
-  size_t multisel_count = 0;
-  if (editor->edit_core) {
-    ptk_anm2_edit_get_selected_item_ids(editor->edit_core, &multisel_count);
-  }
-  if (multisel_count > 1) {
-    if (!update_detail_multisel(editor, &err)) {
-      OV_ERROR_ADD_TRACE(&err);
-      goto cleanup;
-    }
-  } else {
-    size_t sel_idx = 0;
-    size_t item_idx = 0;
-    int const sel_type = get_selected_indices(editor, &sel_idx, &item_idx);
-    if (sel_type == 2) {
-      if (!update_detail_item(editor, sel_idx, item_idx, &err)) {
-        OV_ERROR_ADD_TRACE(&err);
-        goto cleanup;
-      }
-    } else {
-      if (!update_detail_document(editor, &err)) {
-        OV_ERROR_ADD_TRACE(&err);
-        goto cleanup;
-      }
-    }
-  }
-
-  success = true;
-
-cleanup:
-  if (!success) {
-    ptk_logf_error(&err, "%1$hs", "%1$hs", gettext("failed to update detail list."));
-    OV_ERROR_DESTROY(&err);
-  }
+  return sel_id;
 }
 
 /**
@@ -466,107 +275,35 @@ static void on_edit_view_change(void *userdata, struct ptk_anm2_edit_view_event 
     return;
   }
 
+  // Forward treeview events to treeview component
+  if (editor->treeview) {
+    anm2editor_treeview_handle_view_event(editor->treeview, event);
+  }
+
+  // Forward detail events to detail component
+  if (editor->detail) {
+    anm2editor_detail_handle_view_event(editor->detail, event);
+  }
+
+  // Handle editor-specific events
   switch (event->op) {
   case ptk_anm2_edit_view_treeview_rebuild:
-    if (editor->treeview) {
-      anm2editor_treeview_update_differential(editor->treeview, anm2editor_treeview_op_reset, 0, 0, 0);
-    }
-    break;
-
   case ptk_anm2_edit_view_treeview_insert_selector:
-    if (editor->treeview) {
-      anm2editor_treeview_update_differential(
-          editor->treeview, anm2editor_treeview_op_selector_insert, event->id, 0, event->before_id);
-    }
-    break;
-
   case ptk_anm2_edit_view_treeview_remove_selector:
-    if (editor->treeview) {
-      anm2editor_treeview_update_differential(
-          editor->treeview, anm2editor_treeview_op_selector_remove, event->id, 0, 0);
-    }
-    break;
-
   case ptk_anm2_edit_view_treeview_update_selector:
-    if (editor->treeview) {
-      anm2editor_treeview_update_differential(
-          editor->treeview, anm2editor_treeview_op_selector_set_name, event->id, 0, 0);
-    }
-    break;
-
   case ptk_anm2_edit_view_treeview_move_selector:
-    if (editor->treeview) {
-      anm2editor_treeview_update_differential(
-          editor->treeview, anm2editor_treeview_op_selector_move, event->id, 0, event->before_id);
-    }
-    break;
-
   case ptk_anm2_edit_view_treeview_insert_item:
-    if (editor->treeview) {
-      anm2editor_treeview_update_differential(
-          editor->treeview, anm2editor_treeview_op_item_insert, event->id, event->parent_id, event->before_id);
-    }
-    break;
-
   case ptk_anm2_edit_view_treeview_remove_item:
-    if (editor->treeview) {
-      anm2editor_treeview_update_differential(
-          editor->treeview, anm2editor_treeview_op_item_remove, event->id, event->parent_id, 0);
-    }
-    break;
-
   case ptk_anm2_edit_view_treeview_update_item:
-    if (editor->treeview) {
-      anm2editor_treeview_update_differential(editor->treeview, anm2editor_treeview_op_item_set_name, event->id, 0, 0);
-    }
-    break;
-
   case ptk_anm2_edit_view_treeview_move_item:
-    if (editor->treeview) {
-      anm2editor_treeview_update_differential(
-          editor->treeview, anm2editor_treeview_op_item_move, event->id, event->parent_id, event->before_id);
-    }
-    break;
-
   case ptk_anm2_edit_view_treeview_select:
-    // Selection changes - TreeView reads from edit_core directly, just invalidate
-    if (editor->treeview) {
-      anm2editor_treeview_invalidate(editor->treeview);
-    }
-    break;
-
   case ptk_anm2_edit_view_treeview_set_focus:
-    // Focus change - sync focus from edit_core
-    if (editor->treeview) {
-      anm2editor_treeview_suppress_selection_changed(editor->treeview, true);
-      if (event->id == 0) {
-        anm2editor_treeview_select_by_id(editor->treeview, 0, false);
-      } else {
-        anm2editor_treeview_select_by_id(editor->treeview, event->id, event->is_selector);
-      }
-      anm2editor_treeview_suppress_selection_changed(editor->treeview, false);
-    }
+    // Handled by treeview component
     break;
 
   case ptk_anm2_edit_view_detail_refresh:
-    update_detail_list(editor);
-    // Restore ListView selection if requested (after UNDO/REDO)
-    if (editor->detail_restore_sel >= 0) {
-      HWND const listview = (HWND)anm2editor_detail_get_window(editor->detail);
-      if (listview) {
-        int const item_count = (int)SendMessageW(listview, LVM_GETITEMCOUNT, 0, 0);
-        if (editor->detail_restore_sel < item_count) {
-          SendMessageW(listview,
-                       LVM_SETITEMSTATE,
-                       (WPARAM)editor->detail_restore_sel,
-                       (LPARAM) & (LVITEMW){
-                                      .stateMask = LVIS_SELECTED | LVIS_FOCUSED,
-                                      .state = LVIS_SELECTED | LVIS_FOCUSED,
-                                  });
-        }
-      }
-      editor->detail_restore_sel = -1;
-    }
+  case ptk_anm2_edit_view_before_undo_redo:
+    // Handled by detail component
     break;
 
   case ptk_anm2_edit_view_undo_redo_state_changed:
@@ -624,7 +361,7 @@ static bool refresh_all_views(struct ptk_anm2editor *editor, struct ov_error *co
     OV_ERROR_ADD_TRACE(err);
     return false;
   }
-  update_detail_list(editor);
+  anm2editor_detail_refresh(editor->detail);
   update_window_title(editor);
   update_toolbar_state(editor);
   return true;
@@ -653,7 +390,7 @@ static void handle_cmd_file_new(struct ptk_anm2editor *editor) {
   struct ov_error err = {0};
   bool success = false;
 
-  if (!ptk_anm2editor_new(editor, &err)) {
+  if (!ptk_anm2editor_new_document(editor, &err)) {
     OV_ERROR_ADD_TRACE(&err);
     goto cleanup;
   }
@@ -732,7 +469,7 @@ static void treeview_cb_on_selection_changed(void *userdata,
 
   // Selection is already updated in TVN_SELCHANGINGW handler
   // Just update detail list and toolbar here
-  update_detail_list(editor);
+  anm2editor_detail_refresh(editor->detail);
   update_toolbar_state(editor);
 }
 
@@ -748,16 +485,6 @@ static void handle_cmd_undo(struct ptk_anm2editor *editor) {
   if (!editor || !editor->edit_core) {
     return;
   }
-
-  // Save ListView selection before undo for restoration after detail_refresh
-  editor->detail_restore_sel = -1;
-  if (editor->detail) {
-    HWND const listview = (HWND)anm2editor_detail_get_window(editor->detail);
-    if (listview) {
-      editor->detail_restore_sel = (int)SendMessageW(listview, LVM_GETNEXTITEM, (WPARAM)-1, LVNI_SELECTED);
-    }
-  }
-
   struct ov_error err = {0};
   if (!ptk_anm2_edit_undo(editor->edit_core, &err)) {
     show_error_dialog(editor, &err);
@@ -769,25 +496,90 @@ static void handle_cmd_redo(struct ptk_anm2editor *editor) {
   if (!editor || !editor->edit_core) {
     return;
   }
-
-  // Save ListView selection before redo for restoration after detail_refresh
-  editor->detail_restore_sel = -1;
-  if (editor->detail) {
-    HWND const listview = (HWND)anm2editor_detail_get_window(editor->detail);
-    if (listview) {
-      editor->detail_restore_sel = (int)SendMessageW(listview, LVM_GETNEXTITEM, (WPARAM)-1, LVNI_SELECTED);
-    }
-  }
-
   struct ov_error err = {0};
   if (!ptk_anm2_edit_redo(editor->edit_core, &err)) {
     show_error_dialog(editor, &err);
   }
 }
 
-// Import a single script item to the editor
+// Add animation item with parameters to a selector
+static bool add_animation_item(struct ptk_anm2editor *editor,
+                               uint32_t selector_id,
+                               char const *script_name,
+                               char const *display_name,
+                               struct ptk_alias_extracted_param const *params,
+                               size_t param_count,
+                               struct ov_error *err) {
+  if (!editor || !editor->edit_core || !script_name || !display_name || selector_id == 0) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
+    return false;
+  }
+
+  // Use transaction to group all operations for single undo
+  if (!ptk_anm2_edit_begin_transaction(editor->edit_core, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    return false;
+  }
+
+  bool success = false;
+  uint32_t item_id = 0;
+  uint32_t *item_ids = NULL;
+
+  // Insert animation item at the beginning of the selector
+  // For "before" semantics: if items exist, use first item's ID; otherwise use selector_id (appends to empty)
+  uint32_t before_id = selector_id;
+  item_ids = ptk_anm2_get_item_ids(ptk_anm2_edit_get_doc(editor->edit_core), selector_id, err);
+  if (item_ids && OV_ARRAY_LENGTH(item_ids) > 0) {
+    before_id = item_ids[0];
+  } else if (!item_ids) {
+    // Empty selector is not an error, just ignore
+    OV_ERROR_DESTROY(err);
+  }
+  if (!ptk_anm2_edit_insert_animation_item(editor->edit_core, before_id, script_name, display_name, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
+  // Get the inserted item's ID (it's now first in the selector)
+  if (item_ids) {
+    OV_ARRAY_DESTROY(&item_ids);
+  }
+  item_ids = ptk_anm2_get_item_ids(ptk_anm2_edit_get_doc(editor->edit_core), selector_id, err);
+  if (!item_ids || OV_ARRAY_LENGTH(item_ids) == 0) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_unexpected);
+    goto cleanup;
+  }
+  item_id = item_ids[0];
+
+  // Add parameters to the inserted animation item
+  for (size_t i = 0; i < param_count; i++) {
+    if (params[i].key && params[i].value) {
+      if (!ptk_anm2_edit_param_add(editor->edit_core, item_id, params[i].key, params[i].value, err)) {
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+    }
+  }
+
+  success = true;
+
+cleanup:
+  if (item_ids) {
+    OV_ARRAY_DESTROY(&item_ids);
+  }
+  if (!ptk_anm2_edit_end_transaction(editor->edit_core, success, err)) {
+    if (success) {
+      OV_ERROR_ADD_TRACE(err);
+      success = false;
+    }
+  }
+
+  return success;
+}
+
+// Import a single script item to the editor (ID-based)
 static bool import_single_script(struct ptk_anm2editor *const editor,
-                                 size_t const sel_idx,
+                                 uint32_t const selector_id,
                                  char const *const alias,
                                  struct ptk_alias_available_script const *const item,
                                  struct ov_error *const err) {
@@ -798,8 +590,8 @@ static bool import_single_script(struct ptk_anm2editor *const editor,
     OV_ERROR_ADD_TRACE(err);
     goto cleanup;
   }
-  if (!ptk_anm2editor_add_animation_item(
-          editor, sel_idx, anim.script_name, anim.effect_name, anim.params, OV_ARRAY_LENGTH(anim.params), err)) {
+  if (!add_animation_item(
+          editor, selector_id, anim.script_name, anim.effect_name, anim.params, OV_ARRAY_LENGTH(anim.params), err)) {
     OV_ERROR_ADD_TRACE(err);
     goto cleanup;
   }
@@ -821,15 +613,19 @@ static bool import_scripts_execute_transaction(struct ptk_anm2editor *const edit
                                                struct ov_error *const err) {
   bool success = false;
 
-  // Get the selected selector index (or create a new one if none selected)
-  size_t sel_idx = ptk_anm2editor_get_selected_selector_index(editor);
-  if (sel_idx == SIZE_MAX && has_selected) {
+  // Get the selected selector ID (or create a new one if none selected)
+  uint32_t selector_id = get_selected_selector_id(editor);
+  if (selector_id == 0 && has_selected) {
     // No selector selected, add a new one with provided name
     if (!ptk_anm2_edit_add_selector(editor->edit_core, selector_name ? selector_name : "", err)) {
       OV_ERROR_ADD_TRACE(err);
       goto cleanup;
     }
-    sel_idx = ptk_anm2_edit_selector_count(editor->edit_core) - 1;
+    // Get the newly created selector's ID
+    size_t const sel_count = ptk_anm2_edit_selector_count(editor->edit_core);
+    if (sel_count > 0) {
+      selector_id = ptk_anm2_edit_selector_get_id(editor->edit_core, sel_count - 1);
+    }
   }
 
   // Import selected scripts to the editor
@@ -839,7 +635,7 @@ static bool import_scripts_execute_transaction(struct ptk_anm2editor *const edit
       if (!scripts->items[i].selected) {
         continue;
       }
-      if (!import_single_script(editor, sel_idx, alias, &scripts->items[i], err)) {
+      if (!import_single_script(editor, selector_id, alias, &scripts->items[i], err)) {
         OV_ERROR_ADD_TRACE(err);
         goto cleanup;
       }
@@ -848,7 +644,7 @@ static bool import_scripts_execute_transaction(struct ptk_anm2editor *const edit
 
   // Update PSD path if requested
   if (update_psd_path && scripts->psd_path) {
-    if (!ptk_anm2editor_set_psd_path(editor, scripts->psd_path, err)) {
+    if (!ptk_anm2_edit_set_psd_path(editor->edit_core, scripts->psd_path, err)) {
       OV_ERROR_ADD_TRACE(err);
       goto cleanup;
     }
@@ -860,15 +656,26 @@ cleanup:
   return success;
 }
 
-static bool execute_import_scripts_with_transaction(struct ptk_anm2editor *const editor,
-                                                    char const *const alias,
-                                                    struct ptk_alias_available_scripts const *const scripts,
-                                                    char const *const selector_name,
-                                                    bool const has_selected,
-                                                    bool const update_psd_path,
-                                                    struct ov_error *const err) {
+// Callback for anm2editor_import_execute
+static bool import_callback(void *const context,
+                            char const *const alias,
+                            struct ptk_alias_available_scripts const *const scripts,
+                            char const *const selector_name,
+                            bool const update_psd_path,
+                            struct ov_error *const err) {
+  struct ptk_anm2editor *const editor = (struct ptk_anm2editor *)context;
   bool success = false;
   bool transaction_started = false;
+
+  // Check if there are any selected items
+  bool has_selected = false;
+  size_t const n = OV_ARRAY_LENGTH(scripts->items);
+  for (size_t i = 0; i < n; i++) {
+    if (scripts->items[i].selected) {
+      has_selected = true;
+      break;
+    }
+  }
 
   if (!ptk_anm2_edit_begin_transaction(editor->edit_core, err)) {
     OV_ERROR_ADD_TRACE(err);
@@ -893,29 +700,6 @@ cleanup:
   return success;
 }
 
-// Callback for anm2editor_import_execute
-static bool import_callback(void *const context,
-                            char const *const alias,
-                            struct ptk_alias_available_scripts const *const scripts,
-                            char const *const selector_name,
-                            bool const update_psd_path,
-                            struct ov_error *const err) {
-  struct ptk_anm2editor *const editor = (struct ptk_anm2editor *)context;
-
-  // Check if there are any selected items
-  bool has_selected = false;
-  size_t const n = OV_ARRAY_LENGTH(scripts->items);
-  for (size_t i = 0; i < n; i++) {
-    if (scripts->items[i].selected) {
-      has_selected = true;
-      break;
-    }
-  }
-
-  return execute_import_scripts_with_transaction(
-      editor, alias, scripts, selector_name, has_selected, update_psd_path, err);
-}
-
 // New command handler for ID_EDIT_IMPORT_SCRIPTS using anm2editor_import module
 static void handle_cmd_import_scripts(struct ptk_anm2editor *editor) {
   if (!editor || !editor->edit) {
@@ -924,8 +708,8 @@ static void handle_cmd_import_scripts(struct ptk_anm2editor *editor) {
 
   struct ov_error err = {0};
 
-  char const *const current_psd_path = ptk_anm2editor_get_psd_path(editor);
-  bool const has_selected_selector = (ptk_anm2editor_get_selected_selector_index(editor) != SIZE_MAX);
+  char const *const current_psd_path = ptk_anm2_edit_get_psd_path(editor->edit_core);
+  bool const has_selected_selector = (get_selected_selector_id(editor) != 0);
 
   if (!anm2editor_import_execute(
           editor->window, editor->edit, current_psd_path, has_selected_selector, import_callback, editor, &err)) {
@@ -1100,7 +884,7 @@ static bool handle_wm_create(struct ptk_anm2editor *editor, HWND hwnd, struct ov
   }
 
   update_window_title(editor);
-  update_detail_list(editor);
+  anm2editor_detail_refresh(editor->detail);
   update_toolbar_state(editor);
 
   success = true;
@@ -1326,7 +1110,7 @@ bool ptk_anm2editor_create(struct ptk_anm2editor **editor_out,
       .edit = edit_handle,
   };
 
-  editor->edit_core = ptk_anm2_edit_new(err);
+  editor->edit_core = ptk_anm2_edit_create(err);
   if (!editor->edit_core) {
     OV_ERROR_ADD_TRACE(err);
     goto cleanup;
@@ -1429,7 +1213,11 @@ void ptk_anm2editor_destroy(struct ptk_anm2editor **editor_ptr) {
 
 void *ptk_anm2editor_get_window(struct ptk_anm2editor *editor) { return editor ? editor->window : NULL; }
 
-bool ptk_anm2editor_new(struct ptk_anm2editor *editor, struct ov_error *err) {
+struct ptk_anm2_edit *ptk_anm2editor_get_edit(struct ptk_anm2editor *editor) {
+  return editor ? editor->edit_core : NULL;
+}
+
+bool ptk_anm2editor_new_document(struct ptk_anm2editor *editor, struct ov_error *err) {
   if (!editor) {
     OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
     return false;
@@ -1714,27 +1502,6 @@ bool ptk_anm2editor_is_open(struct ptk_anm2editor *editor) {
   return IsWindowVisible(editor->window) != 0;
 }
 
-char const *ptk_anm2editor_get_psd_path(struct ptk_anm2editor *editor) {
-  if (!editor || !editor->edit_core) {
-    return NULL;
-  }
-  return ptk_anm2_edit_get_psd_path(editor->edit_core);
-}
-
-bool ptk_anm2editor_set_psd_path(struct ptk_anm2editor *editor, char const *path, struct ov_error *err) {
-  if (!editor || !editor->edit_core) {
-    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
-    return false;
-  }
-
-  if (!ptk_anm2_edit_set_psd_path(editor->edit_core, path, err)) {
-    OV_ERROR_ADD_TRACE(err);
-    return false;
-  }
-
-  return true;
-}
-
 /**
  * @brief Check PSD path mismatch and show warning dialog if needed
  *
@@ -1883,8 +1650,7 @@ bool ptk_anm2editor_add_value_item_to_selected(struct ptk_anm2editor *editor,
 
   bool transaction_started = false;
   bool success = false;
-  uint32_t selector_id = 0;
-  size_t sel_idx = ptk_anm2editor_get_selected_selector_index(editor);
+  uint32_t selector_id = get_selected_selector_id(editor);
 
   // Use transaction to group all operations for single undo
   if (!ptk_anm2_edit_begin_transaction(editor->edit_core, err)) {
@@ -1898,15 +1664,18 @@ bool ptk_anm2editor_add_value_item_to_selected(struct ptk_anm2editor *editor,
     goto cleanup;
   }
 
-  if (sel_idx == SIZE_MAX) {
+  if (selector_id == 0) {
     // No selector selected, create a new one
     if (!ptk_anm2_edit_add_selector(editor->edit_core, group ? group : "", err)) {
       OV_ERROR_ADD_TRACE(err);
       goto cleanup;
     }
-    sel_idx = ptk_anm2_edit_selector_count(editor->edit_core) - 1;
+    // Get the newly created selector's ID
+    size_t const sel_count = ptk_anm2_edit_selector_count(editor->edit_core);
+    if (sel_count > 0) {
+      selector_id = ptk_anm2_edit_selector_get_id(editor->edit_core, sel_count - 1);
+    }
   }
-  selector_id = ptk_anm2_edit_selector_get_id(editor->edit_core, sel_idx);
 
   // Add value item to the selector
   if (!ptk_anm2_edit_add_value_item_to_selector(
@@ -1924,266 +1693,6 @@ cleanup:
         OV_ERROR_ADD_TRACE(err);
         success = false;
       }
-    }
-  }
-
-  return success;
-}
-
-void ptk_anm2editor_ptkl_targets_free(struct ptk_anm2editor_ptkl_targets *targets) {
-  if (!targets) {
-    return;
-  }
-  if (targets->items) {
-    size_t const len = OV_ARRAY_LENGTH(targets->items);
-    for (size_t i = 0; i < len; i++) {
-      struct ptk_anm2editor_ptkl_target *t = &targets->items[i];
-      if (t->selector_name) {
-        OV_ARRAY_DESTROY(&t->selector_name);
-      }
-      if (t->effect_name) {
-        OV_ARRAY_DESTROY(&t->effect_name);
-      }
-      if (t->param_key) {
-        OV_ARRAY_DESTROY(&t->param_key);
-      }
-    }
-    OV_ARRAY_DESTROY(&targets->items);
-  }
-  *targets = (struct ptk_anm2editor_ptkl_targets){0};
-}
-
-static bool ends_with_ptkl(char const *s) {
-  if (!s) {
-    return false;
-  }
-  size_t const len = strlen(s);
-  if (len < 5) {
-    return false;
-  }
-  return strcmp(s + len - 5, "~ptkl") == 0;
-}
-
-static bool add_ptkl_target(struct ptk_anm2editor_ptkl_targets *targets,
-                            char const *selector_name,
-                            char const *effect_name,
-                            char const *param_key,
-                            size_t sel_idx,
-                            size_t item_idx,
-                            size_t param_idx,
-                            struct ov_error *err) {
-  size_t const current_len = OV_ARRAY_LENGTH(targets->items);
-  if (!OV_ARRAY_GROW(&targets->items, current_len + 1)) {
-    OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
-    return false;
-  }
-
-  struct ptk_anm2editor_ptkl_target *t = &targets->items[current_len];
-  *t = (struct ptk_anm2editor_ptkl_target){
-      .sel_idx = sel_idx,
-      .item_idx = item_idx,
-      .param_idx = param_idx,
-  };
-
-  if (selector_name) {
-    size_t const len = strlen(selector_name);
-    if (!OV_ARRAY_GROW(&t->selector_name, len + 1)) {
-      OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
-      return false;
-    }
-    memcpy(t->selector_name, selector_name, len + 1);
-    OV_ARRAY_SET_LENGTH(t->selector_name, len);
-  }
-
-  if (effect_name) {
-    size_t const len = strlen(effect_name);
-    if (!OV_ARRAY_GROW(&t->effect_name, len + 1)) {
-      OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
-      return false;
-    }
-    memcpy(t->effect_name, effect_name, len + 1);
-    OV_ARRAY_SET_LENGTH(t->effect_name, len);
-  }
-
-  if (param_key) {
-    size_t const len = strlen(param_key);
-    if (!OV_ARRAY_GROW(&t->param_key, len + 1)) {
-      OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
-      return false;
-    }
-    memcpy(t->param_key, param_key, len + 1);
-    OV_ARRAY_SET_LENGTH(t->param_key, len);
-  }
-
-  OV_ARRAY_SET_LENGTH(targets->items, current_len + 1);
-  return true;
-}
-
-bool ptk_anm2editor_collect_selected_ptkl_targets(struct ptk_anm2editor *editor,
-                                                  struct ptk_anm2editor_ptkl_targets *targets,
-                                                  struct ov_error *err) {
-  if (!editor || !targets) {
-    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
-    return false;
-  }
-
-  *targets = (struct ptk_anm2editor_ptkl_targets){0};
-
-  if (!editor->edit_core) {
-    return true;
-  }
-
-  // Get currently selected selector
-  size_t sel_idx = 0;
-  size_t item_idx = 0;
-  int const sel_type = get_selected_indices(editor, &sel_idx, &item_idx);
-  if (sel_type == 0) {
-    // Nothing selected
-    return true;
-  }
-
-  // sel_type 1 or 2 means a selector (or item within it) is selected
-  uint32_t const sel_id = ptk_anm2_edit_selector_get_id(editor->edit_core, sel_idx);
-  if (sel_id == 0) {
-    return true;
-  }
-
-  size_t const num_items = ptk_anm2_edit_item_count(editor->edit_core, sel_id);
-  for (size_t i = 0; i < num_items; i++) {
-    uint32_t const item_id = ptk_anm2_edit_item_get_id(editor->edit_core, sel_idx, i);
-    if (!ptk_anm2_edit_item_is_animation(editor->edit_core, item_id)) {
-      continue;
-    }
-
-    size_t const num_params = ptk_anm2_edit_param_count(editor->edit_core, item_id);
-    for (size_t param_idx = 0; param_idx < num_params; param_idx++) {
-      uint32_t const param_id = ptk_anm2_edit_param_get_id(editor->edit_core, sel_idx, i, param_idx);
-      char const *key = ptk_anm2_edit_param_get_key(editor->edit_core, param_id);
-      if (!ends_with_ptkl(key)) {
-        continue;
-      }
-
-      char const *group = ptk_anm2_edit_selector_get_name(editor->edit_core, sel_id);
-      char const *name = ptk_anm2_edit_item_get_name(editor->edit_core, item_id);
-      if (!add_ptkl_target(targets, group, name, key, sel_idx, i, param_idx, err)) {
-        OV_ERROR_ADD_TRACE(err);
-        ptk_anm2editor_ptkl_targets_free(targets);
-        return false;
-      }
-    }
-  }
-
-  return true;
-}
-
-bool ptk_anm2editor_set_param_value(struct ptk_anm2editor *editor,
-                                    size_t sel_idx,
-                                    size_t item_idx,
-                                    size_t param_idx,
-                                    char const *value,
-                                    struct ov_error *err) {
-  if (!editor || !editor->edit_core || !value) {
-    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
-    return false;
-  }
-
-  uint32_t const param_id = ptk_anm2_edit_param_get_id(editor->edit_core, sel_idx, item_idx, param_idx);
-  if (param_id == 0) {
-    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
-    return false;
-  }
-
-  if (!ptk_anm2_edit_param_set_value(editor->edit_core, param_id, value, err)) {
-    OV_ERROR_ADD_TRACE(err);
-    return false;
-  }
-
-  return true;
-}
-
-size_t ptk_anm2editor_get_selected_selector_index(struct ptk_anm2editor *editor) {
-  if (!editor || !editor->edit_core) {
-    return SIZE_MAX;
-  }
-
-  size_t sel_idx = 0;
-  size_t item_idx = 0;
-  int const sel_type = get_selected_indices(editor, &sel_idx, &item_idx);
-
-  // Return the selector index if something is selected
-  if (sel_type == 0) {
-    return SIZE_MAX;
-  }
-
-  // Verify the selector index is valid
-  if (sel_idx >= ptk_anm2_edit_selector_count(editor->edit_core)) {
-    return SIZE_MAX;
-  }
-
-  return sel_idx;
-}
-
-bool ptk_anm2editor_add_animation_item(struct ptk_anm2editor *editor,
-                                       size_t sel_idx,
-                                       char const *script_name,
-                                       char const *display_name,
-                                       struct ptk_alias_extracted_param const *params,
-                                       size_t param_count,
-                                       struct ov_error *err) {
-  if (!editor || !editor->edit_core || !script_name || !display_name) {
-    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
-    return false;
-  }
-
-  // Verify selector index
-  if (sel_idx >= ptk_anm2_edit_selector_count(editor->edit_core)) {
-    OV_ERROR_SET(err, ov_error_type_generic, ov_error_generic_invalid_argument, "selector index out of range");
-    return false;
-  }
-
-  uint32_t const selector_id = ptk_anm2_edit_selector_get_id(editor->edit_core, sel_idx);
-
-  // Use transaction to group all operations for single undo
-  if (!ptk_anm2_edit_begin_transaction(editor->edit_core, err)) {
-    OV_ERROR_ADD_TRACE(err);
-    return false;
-  }
-
-  bool success = false;
-  uint32_t item_id = 0;
-
-  // Insert animation item at the beginning of the selector
-  // For "before" semantics: if items exist, use first item's ID; otherwise use selector_id (appends to empty)
-  uint32_t before_id = selector_id;
-  size_t const item_count = ptk_anm2_edit_item_count(editor->edit_core, selector_id);
-  if (item_count > 0) {
-    before_id = ptk_anm2_edit_item_get_id(editor->edit_core, sel_idx, 0);
-  }
-  if (!ptk_anm2_edit_insert_animation_item(editor->edit_core, before_id, script_name, display_name, err)) {
-    OV_ERROR_ADD_TRACE(err);
-    goto cleanup;
-  }
-
-  // Get the inserted item's ID (it's now at index 0)
-  item_id = ptk_anm2_edit_item_get_id(editor->edit_core, sel_idx, 0);
-
-  // Add parameters to the inserted animation item
-  for (size_t i = 0; i < param_count; i++) {
-    if (params[i].key && params[i].value) {
-      if (!ptk_anm2_edit_param_add(editor->edit_core, item_id, params[i].key, params[i].value, err)) {
-        OV_ERROR_ADD_TRACE(err);
-        goto cleanup;
-      }
-    }
-  }
-
-  success = true;
-
-cleanup:
-  if (!ptk_anm2_edit_end_transaction(editor->edit_core, success, err)) {
-    if (success) {
-      OV_ERROR_ADD_TRACE(err);
-      success = false;
     }
   }
 

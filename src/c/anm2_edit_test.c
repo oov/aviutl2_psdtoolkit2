@@ -15,17 +15,16 @@ static bool selection_contains(uint32_t const *ids, size_t count, uint32_t id) {
   return false;
 }
 
+// Test helper to get mutable doc pointer (bypasses const for testing)
+static struct ptk_anm2 *get_doc(struct ptk_anm2_edit *edit) {
+  return (struct ptk_anm2 *)ov_deconster_(ptk_anm2_edit_get_doc(edit));
+}
+
 static void test_edit_create_destroy(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-
-  TEST_FAILED_WITH(
-      ptk_anm2_edit_create(NULL, &err) != NULL, &err, ov_error_type_generic, ov_error_generic_invalid_argument);
-
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   struct ptk_anm2_edit_state state = {0};
@@ -41,14 +40,14 @@ static void test_edit_create_destroy(void) {
 
 static void test_selection_click(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t sel_id = 0;
   uint32_t id_a = 0;
   uint32_t id_b = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
@@ -83,14 +82,14 @@ static void test_selection_click(void) {
 
 static void test_selection_ctrl_toggle(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t sel_id = 0;
   uint32_t id_a = 0;
   uint32_t id_b = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
@@ -128,7 +127,6 @@ static void test_selection_ctrl_toggle(void) {
 
 static void test_selection_shift_range(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t sel_id = 0;
   uint32_t id_a = 0;
@@ -136,8 +134,9 @@ static void test_selection_shift_range(void) {
   uint32_t id_c = 0;
   uint32_t id_d = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
@@ -171,14 +170,14 @@ static void test_selection_shift_range(void) {
 
 static void test_selection_ctrl_selector(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t group_id = 0;
   uint32_t id_a = 0;
   uint32_t id_b = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
@@ -217,11 +216,11 @@ static void test_selection_ctrl_selector(void) {
 
 static void test_edit_selector_ops(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_add_selector(edit, "A", &err), &err);
@@ -245,13 +244,13 @@ static void test_edit_selector_ops(void) {
 
 static void test_edit_item_rename_value(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t sel_id = 0;
   uint32_t id_a = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
@@ -273,14 +272,14 @@ static void test_edit_item_rename_value(void) {
 
 static void test_edit_multisel_detail_updates(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t sel_id = 0;
   uint32_t id_a = 0;
   uint32_t id_b = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
@@ -321,14 +320,14 @@ static void test_edit_multisel_detail_updates(void) {
 
 static void test_edit_delete_selected(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t group_id = 0;
   uint32_t id_a = 0;
   uint32_t id_b = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
@@ -354,15 +353,15 @@ static void test_edit_delete_selected(void) {
 
 static void test_edit_reverse_focus_selector(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t group_id = 0;
   uint32_t id_a = 0;
   uint32_t id_b = 0;
   uint32_t id_c = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
@@ -386,7 +385,6 @@ static void test_edit_reverse_focus_selector(void) {
 
 static void test_edit_move_items_order(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t group_a = 0;
   uint32_t group_b = 0;
@@ -395,8 +393,9 @@ static void test_edit_move_items_order(void) {
   uint32_t id_c = 0;
   uint32_t id_d = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   group_a = ptk_anm2_selector_insert(doc, 0, "A", &err);
@@ -439,11 +438,11 @@ static void test_edit_move_items_order(void) {
 
 static void test_edit_param_ops(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
@@ -487,11 +486,11 @@ static void test_edit_param_ops(void) {
 
 static void test_edit_document_props(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_set_label(edit, "Label", &err), &err);
@@ -513,15 +512,15 @@ static void test_edit_document_props(void) {
 
 static void test_edit_update_on_doc_op(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t sel_id = 0;
   uint32_t item_id = 0;
   uint32_t item_id2 = 0;
   uint32_t item_id3 = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
@@ -564,14 +563,14 @@ static void test_edit_update_on_doc_op(void) {
 
 static void test_update_on_doc_op_set_operations(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t group_id = 0;
   uint32_t id_a = 0;
   uint32_t id_b = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
@@ -630,15 +629,15 @@ static void test_update_on_doc_op_set_operations(void) {
 
 static void test_update_on_doc_op_insert_operations(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t sel1_id = 0;
   uint32_t sel2_id = 0;
   uint32_t id_a = 0;
   uint32_t id_b = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   sel1_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
@@ -676,7 +675,6 @@ static void test_update_on_doc_op_insert_operations(void) {
 
 static void test_update_on_doc_op_move_operations(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t sel1_id = 0;
   uint32_t sel2_id = 0;
@@ -684,8 +682,9 @@ static void test_update_on_doc_op_move_operations(void) {
   uint32_t id_b = 0;
   uint32_t id_c = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   sel1_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
@@ -733,15 +732,15 @@ static void test_update_on_doc_op_move_operations(void) {
 
 static void test_update_on_doc_op_remove_selector(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t group1 = 0;
   uint32_t group2 = 0;
   uint32_t id_a = 0;
   uint32_t id_b = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   group1 = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
@@ -777,7 +776,6 @@ static void test_update_on_doc_op_remove_selector(void) {
 
 static void test_edit_move_items_within_same_group(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t sel_id = 0;
   uint32_t id_a = 0;
@@ -785,8 +783,9 @@ static void test_edit_move_items_within_same_group(void) {
   uint32_t id_c = 0;
   uint32_t id_d = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
@@ -824,7 +823,6 @@ static void test_edit_move_items_within_same_group(void) {
 
 static void test_edit_move_items_to_item(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t sel1_id = 0;
   uint32_t sel2_id = 0;
@@ -832,8 +830,9 @@ static void test_edit_move_items_to_item(void) {
   uint32_t id_b = 0;
   uint32_t id_c = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   sel1_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
@@ -863,11 +862,11 @@ static void test_edit_move_items_to_item(void) {
 
 static void test_selection_refresh_selector_removed(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   uint32_t group1 = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
@@ -932,11 +931,9 @@ static size_t log_count_op(struct view_callback_log const *log, enum ptk_anm2_ed
 
 static void test_view_callback_basic(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   struct view_callback_log log = {0};
@@ -956,11 +953,11 @@ static void test_view_callback_basic(void) {
 
 static void test_view_callback_on_add_selector(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   struct view_callback_log log = {0};
@@ -980,13 +977,13 @@ static void test_view_callback_on_add_selector(void) {
 
 static void test_view_callback_on_focus_change(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t group_id = 0;
   uint32_t item_id = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   group_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
@@ -1009,12 +1006,12 @@ static void test_view_callback_on_focus_change(void) {
 
 static void test_view_callback_transaction_buffering(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t sel_id = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   struct view_callback_log log = {0};
@@ -1065,13 +1062,13 @@ static void test_view_callback_transaction_buffering(void) {
 
 static void test_view_callback_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   uint32_t sel_id = 0;
   uint32_t item_id = 0;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Add some items via transaction
@@ -1127,11 +1124,11 @@ static void test_view_callback_undo_redo(void) {
 
 static void test_view_callback_single_op_undo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Add a single item (no transaction)
@@ -1158,11 +1155,11 @@ static void test_view_callback_single_op_undo(void) {
 
 static void test_view_callback_state_dedup(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   struct view_callback_log log = {0};
@@ -1212,11 +1209,11 @@ static void test_view_callback_state_dedup(void) {
 
 static void test_undo_restores_multiselection(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Create items A, B, C in a group
@@ -1278,11 +1275,11 @@ static void test_undo_restores_multiselection(void) {
 
 static void test_undo_after_move_selector(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Create groups A, B, C
@@ -1327,11 +1324,11 @@ static void test_undo_after_move_selector(void) {
 
 static void test_view_callback_move_selector_and_undo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Create groups A, B, C
@@ -1418,11 +1415,11 @@ static void test_view_callback_move_selector_and_undo(void) {
 
 static void test_view_callback_move_item_and_undo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Create group with items A, B, C
@@ -1489,12 +1486,12 @@ static void test_view_callback_move_item_and_undo(void) {
 
 static void test_add_selector_and_undo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   struct view_callback_log log = {0};
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Set up view callback to monitor events
@@ -1560,11 +1557,11 @@ static void test_add_selector_and_undo(void) {
 
 static void test_swap_adjacent_selectors(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Create A, B - swap A with B (move A to B position = move A after B)
@@ -1600,11 +1597,11 @@ static void test_swap_adjacent_selectors(void) {
 
 static void test_swap_adjacent_items(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   uint32_t grp = ptk_anm2_selector_insert(doc, 0, "Group", &err);
@@ -1635,12 +1632,12 @@ static void test_swap_adjacent_items(void) {
 
 static void test_add_item_and_undo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
   struct view_callback_log log = {0};
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
@@ -1680,11 +1677,11 @@ static void test_add_item_and_undo(void) {
 // Test would_move_items with selection range check
 static void test_would_move_items_selection_range(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
   struct ptk_anm2_edit *edit = NULL;
 
-  TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
-  edit = ptk_anm2_edit_create(doc, &err);
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Create A, B, C, D items in one group

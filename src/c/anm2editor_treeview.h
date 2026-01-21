@@ -89,14 +89,6 @@ NODISCARD struct anm2editor_treeview *anm2editor_treeview_create(void *parent_wi
 void anm2editor_treeview_destroy(struct anm2editor_treeview **tv);
 
 /**
- * @brief Get the window handle of the TreeView
- *
- * @param tv TreeView instance
- * @return Window handle (HWND cast to void*)
- */
-void *anm2editor_treeview_get_window(struct anm2editor_treeview *tv);
-
-/**
  * @brief Set the position and size of the TreeView
  *
  * @param tv TreeView instance
@@ -157,15 +149,6 @@ void anm2editor_treeview_select_by_id(struct anm2editor_treeview *tv, uint32_t i
  * @param item_idx Item index (SIZE_MAX to select the selector itself)
  */
 void anm2editor_treeview_select_by_index(struct anm2editor_treeview *tv, size_t sel_idx, size_t item_idx);
-
-/**
- * @brief Get the currently selected item
- *
- * @param tv TreeView instance
- * @param out Output item info (filled if return is true)
- * @return true if something is selected
- */
-bool anm2editor_treeview_get_selected(struct anm2editor_treeview *tv, struct anm2editor_treeview_item_info *out);
 
 /**
  * @brief Update the text of the currently selected item
@@ -229,3 +212,14 @@ void anm2editor_treeview_handle_lbutton_up(struct anm2editor_treeview *tv);
  * @param tv TreeView instance
  */
 void anm2editor_treeview_cancel_drag(struct anm2editor_treeview *tv);
+
+/**
+ * @brief Handle view change event from anm2_edit
+ *
+ * Processes treeview-related view change events forwarded from anm2_edit.
+ *
+ * @param tv TreeView instance
+ * @param event View event to handle
+ */
+void anm2editor_treeview_handle_view_event(struct anm2editor_treeview *tv,
+                                           struct ptk_anm2_edit_view_event const *event);

@@ -2,7 +2,6 @@
 
 #include <ovbase.h>
 
-// Forward declaration
 struct ptk_alias_available_script;
 
 /**

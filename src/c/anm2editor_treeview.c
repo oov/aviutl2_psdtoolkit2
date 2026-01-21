@@ -622,8 +622,6 @@ void anm2editor_treeview_destroy(struct anm2editor_treeview **tv) {
   OV_FREE(tv);
 }
 
-void *anm2editor_treeview_get_window(struct anm2editor_treeview *tv) { return tv ? tv->window : NULL; }
-
 void anm2editor_treeview_set_position(struct anm2editor_treeview *tv, int x, int y, int width, int height) {
   if (!tv || !tv->window) {
     return;
@@ -1003,25 +1001,6 @@ void anm2editor_treeview_select_by_index(struct anm2editor_treeview *tv, size_t 
   }
 }
 
-bool anm2editor_treeview_get_selected(struct anm2editor_treeview *tv, struct anm2editor_treeview_item_info *out) {
-  if (!tv || !tv->window || !out) {
-    return false;
-  }
-
-  HTREEITEM hItem = (HTREEITEM)(SendMessageW(tv->window, TVM_GETNEXTITEM, TVGN_CARET, 0));
-  if (!hItem) {
-    return false;
-  }
-
-  TVITEMW tvi = {.mask = TVIF_PARAM, .hItem = hItem};
-  if (!SendMessageW(tv->window, TVM_GETITEMW, 0, (LPARAM)&tvi)) {
-    return false;
-  }
-
-  out->is_selector = treeview_decode_lparam(tvi.lParam, &out->id);
-  return true;
-}
-
 static void begin_edit_selected(struct anm2editor_treeview *tv) {
   if (!tv || !tv->window) {
     return;
@@ -1337,6 +1316,77 @@ intptr_t anm2editor_treeview_handle_notify(struct anm2editor_treeview *tv, void 
 
   default:
     return 0;
+  }
+}
+
+void anm2editor_treeview_handle_view_event(struct anm2editor_treeview *tv,
+                                           struct ptk_anm2_edit_view_event const *event) {
+  if (!tv || !event) {
+    return;
+  }
+
+  switch (event->op) {
+  case ptk_anm2_edit_view_treeview_rebuild:
+    anm2editor_treeview_update_differential(tv, anm2editor_treeview_op_reset, 0, 0, 0);
+    break;
+
+  case ptk_anm2_edit_view_treeview_insert_selector:
+    anm2editor_treeview_update_differential(tv, anm2editor_treeview_op_selector_insert, event->id, 0, event->before_id);
+    break;
+
+  case ptk_anm2_edit_view_treeview_remove_selector:
+    anm2editor_treeview_update_differential(tv, anm2editor_treeview_op_selector_remove, event->id, 0, 0);
+    break;
+
+  case ptk_anm2_edit_view_treeview_update_selector:
+    anm2editor_treeview_update_differential(tv, anm2editor_treeview_op_selector_set_name, event->id, 0, 0);
+    break;
+
+  case ptk_anm2_edit_view_treeview_move_selector:
+    anm2editor_treeview_update_differential(tv, anm2editor_treeview_op_selector_move, event->id, 0, event->before_id);
+    break;
+
+  case ptk_anm2_edit_view_treeview_insert_item:
+    anm2editor_treeview_update_differential(
+        tv, anm2editor_treeview_op_item_insert, event->id, event->parent_id, event->before_id);
+    break;
+
+  case ptk_anm2_edit_view_treeview_remove_item:
+    anm2editor_treeview_update_differential(tv, anm2editor_treeview_op_item_remove, event->id, event->parent_id, 0);
+    break;
+
+  case ptk_anm2_edit_view_treeview_update_item:
+    anm2editor_treeview_update_differential(tv, anm2editor_treeview_op_item_set_name, event->id, 0, 0);
+    break;
+
+  case ptk_anm2_edit_view_treeview_move_item:
+    anm2editor_treeview_update_differential(
+        tv, anm2editor_treeview_op_item_move, event->id, event->parent_id, event->before_id);
+    break;
+
+  case ptk_anm2_edit_view_treeview_select:
+    // Selection changes - read from edit_core, just invalidate for visual update
+    anm2editor_treeview_invalidate(tv);
+    break;
+
+  case ptk_anm2_edit_view_treeview_set_focus:
+    // Focus change - sync focus from edit_core
+    anm2editor_treeview_suppress_selection_changed(tv, true);
+    if (event->id == 0) {
+      anm2editor_treeview_select_by_id(tv, 0, false);
+    } else {
+      anm2editor_treeview_select_by_id(tv, event->id, event->is_selector);
+    }
+    anm2editor_treeview_suppress_selection_changed(tv, false);
+    break;
+
+  case ptk_anm2_edit_view_detail_refresh:
+  case ptk_anm2_edit_view_undo_redo_state_changed:
+  case ptk_anm2_edit_view_modified_state_changed:
+  case ptk_anm2_edit_view_save_state_changed:
+  case ptk_anm2_edit_view_before_undo_redo:
+    // Non-treeview events - handled by parent
+    break;
   }
 }
 

@@ -1,8 +1,8 @@
 #pragma once
 
+#include "anm2_edit.h"
 #include <ovbase.h>
 
-struct ptk_anm2_edit;
 struct anm2editor_detail;
 
 /**
@@ -108,6 +108,19 @@ void anm2editor_detail_set_position(struct anm2editor_detail *detail, int x, int
 void anm2editor_detail_clear(struct anm2editor_detail *detail);
 
 /**
+ * @brief Refresh the detail list content based on current selection state
+ *
+ * Clears and rebuilds the detail list based on the current selection state
+ * from the associated anm2_edit instance. Handles three modes:
+ * - Multi-selection: Shows selected items in tree order
+ * - Single item selection: Shows item parameters
+ * - No selection: Shows document properties
+ *
+ * @param detail Detail list instance
+ */
+void anm2editor_detail_refresh(struct anm2editor_detail *detail);
+
+/**
  * @brief Add a row to the detail list
  *
  * @param detail Detail list instance
@@ -161,15 +174,6 @@ NODISCARD bool anm2editor_detail_insert_row(struct anm2editor_detail *detail,
  * @param row_index Index of the row to remove
  */
 void anm2editor_detail_remove_row(struct anm2editor_detail *detail, size_t row_index);
-
-/**
- * @brief Get row information by index
- *
- * @param detail Detail list instance
- * @param row_index Index of the row
- * @return Row information, or NULL if index is invalid
- */
-struct anm2editor_detail_row const *anm2editor_detail_get_row(struct anm2editor_detail const *detail, size_t row_index);
 
 /**
  * @brief Get the number of rows in the detail list
@@ -248,3 +252,14 @@ bool anm2editor_detail_is_editing(struct anm2editor_detail const *detail);
  * @return LRESULT to return from window procedure
  */
 intptr_t anm2editor_detail_handle_notify(struct anm2editor_detail *detail, void *nmhdr);
+
+/**
+ * @brief Handle view change event from anm2_edit
+ *
+ * Processes detail-related view change events forwarded from anm2_edit.
+ *
+ * @param detail Detail list instance
+ * @param event View event to handle
+ */
+void anm2editor_detail_handle_view_event(struct anm2editor_detail *detail,
+                                         struct ptk_anm2_edit_view_event const *event);

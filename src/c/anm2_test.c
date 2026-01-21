@@ -40,7 +40,7 @@ static wchar_t const *const test_data_mixed = TEST_PATH(L"mixed.lua");
 
 static void test_new_destroy(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
 
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
   TEST_CHECK(doc != NULL);
@@ -66,7 +66,7 @@ static void test_destroy_null(void) {
 
 static void test_reset(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Add some data to the document
@@ -129,7 +129,7 @@ reset_test_callback(void *userdata, enum ptk_anm2_op_type op, uint32_t id, uint3
 
 static void test_reset_preserves_callback(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Set up callback tracking
@@ -169,7 +169,7 @@ cleanup:
 
 static void test_selector_add(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
@@ -193,7 +193,7 @@ static void test_selector_add(void) {
 
 static void test_selector_remove(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t id1 = 0;
   uint32_t id2 = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
@@ -221,7 +221,7 @@ cleanup:
 
 static void test_selector_set_group(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t id = ptk_anm2_selector_insert(doc, 0, "Original", &err);
@@ -241,7 +241,7 @@ cleanup:
 
 static void test_selector_move_to(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t id_a = 0;
   uint32_t id_b = 0;
   uint32_t id_c = 0;
@@ -276,7 +276,7 @@ cleanup:
 
 static void test_selector_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
@@ -304,7 +304,7 @@ cleanup:
 
 static void test_item_add_value(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t id = 0;
   uint32_t id2 = 0;
@@ -340,7 +340,7 @@ cleanup:
 
 static void test_item_insert_value(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t first_id = 0;
   uint32_t third_id = 0;
@@ -385,7 +385,7 @@ cleanup:
 
 static void test_item_add_animation(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
@@ -419,7 +419,7 @@ static void test_item_insert_animation(void) {
   uint32_t first_id = 0;
   uint32_t third_id = 0;
   uint32_t id = 0;
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
@@ -465,7 +465,7 @@ cleanup:
 
 static void test_item_remove(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t item1_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
@@ -499,7 +499,7 @@ cleanup:
 
 static void test_item_move_after(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t item_a = 0;
   uint32_t item_c = 0;
@@ -546,7 +546,7 @@ cleanup:
 
 static void test_item_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
@@ -584,7 +584,7 @@ static void test_param_add(void) {
   uint32_t sel_id = 0;
   uint32_t id = 0;
   uint32_t item_id = 0;
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
@@ -619,7 +619,7 @@ static void test_param_insert_after_by_id(void) {
   uint32_t item_id = 0;
   uint32_t first_param_id = 0;
   uint32_t third_param_id = 0;
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
@@ -669,7 +669,7 @@ cleanup:
 
 static void test_param_remove(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t item_id = 0;
   uint32_t param1_id = 0;
@@ -708,7 +708,7 @@ cleanup:
 
 static void test_param_set_key_value(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t item_id = 0;
   uint32_t param_id = 0;
@@ -743,7 +743,7 @@ cleanup:
 
 static void test_param_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t item_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
@@ -785,7 +785,7 @@ static void test_selector_id_userdata(void) {
   struct ov_error err = {0};
   uint32_t id1 = 0;
   uint32_t id2 = 0;
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Add two selectors
@@ -828,7 +828,7 @@ static void test_item_id_userdata(void) {
   uint32_t id1 = 0;
   uint32_t id2 = 0;
   uint32_t id3 = 0;
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Add a selector
@@ -876,7 +876,7 @@ static void test_param_id_userdata(void) {
   uint32_t id1 = 0;
   uint32_t id2 = 0;
   uint32_t item_id = 0;
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Add a selector and animation item
@@ -928,7 +928,7 @@ static void test_find_selector_by_id(void) {
   uint32_t id2 = 0;
   uint32_t id3 = 0;
   size_t found_idx = SIZE_MAX;
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Add selectors
@@ -978,7 +978,7 @@ static void test_find_item_by_id(void) {
   uint32_t item_id3 = 0;
   size_t found_sel_idx = SIZE_MAX;
   size_t found_item_idx = SIZE_MAX;
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Add selectors and items
@@ -1045,7 +1045,7 @@ static void test_find_param_by_id(void) {
   size_t found_sel_idx = SIZE_MAX;
   size_t found_item_idx = SIZE_MAX;
   size_t found_param_idx = SIZE_MAX;
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Add selector with animation items (only animation items can have params)
@@ -1118,7 +1118,7 @@ cleanup:
 
 static void test_set_label(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   if (!TEST_SUCCEEDED(ptk_anm2_set_label(doc, "Test Label", &err), &err)) {
@@ -1135,7 +1135,7 @@ cleanup:
 
 static void test_set_psd_path(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   if (!TEST_SUCCEEDED(ptk_anm2_set_psd_path(doc, "C:/path/to/test.psd", &err), &err)) {
@@ -1151,7 +1151,7 @@ cleanup:
 
 static void test_metadata_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Set label
@@ -1196,7 +1196,7 @@ cleanup:
 
 static void test_transaction_basic(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Begin transaction
@@ -1248,7 +1248,7 @@ cleanup:
 
 static void test_transaction_nested(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Begin outer transaction
@@ -1341,7 +1341,7 @@ static void test_change_callback_basic(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
   uint32_t sel_id = 0;
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   ptk_anm2_set_change_callback(doc, test_change_callback_fn, &tracker);
@@ -1378,7 +1378,7 @@ cleanup:
 static void test_change_callback_transaction(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   ptk_anm2_set_change_callback(doc, test_change_callback_fn, &tracker);
@@ -1430,7 +1430,7 @@ cleanup:
 static void test_change_callback_undo_redo_transaction(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Create a transaction with multiple operations
@@ -1511,7 +1511,7 @@ cleanup:
 
 static void test_undo_clears_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   if (!TEST_SUCCEEDED(ptk_anm2_set_label(doc, "First", &err), &err)) {
@@ -1539,7 +1539,7 @@ cleanup:
 
 static void test_clear_undo_history(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   if (!TEST_SUCCEEDED(ptk_anm2_set_label(doc, "Test", &err), &err)) {
@@ -1562,7 +1562,7 @@ cleanup:
 
 static void test_undo_empty_returns_false(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   TEST_CHECK(!ptk_anm2_can_undo(doc));
@@ -1573,7 +1573,7 @@ static void test_undo_empty_returns_false(void) {
 
 static void test_redo_empty_returns_false(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   TEST_CHECK(!ptk_anm2_can_redo(doc));
@@ -1584,7 +1584,7 @@ static void test_redo_empty_returns_false(void) {
 
 static void test_invalid_selector_index(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // No selectors - invalid ID (0) should return NULL/false
@@ -1601,7 +1601,7 @@ static void test_invalid_selector_index(void) {
 
 static void test_invalid_item_index(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Group1", &err), &err)) {
@@ -1621,7 +1621,7 @@ cleanup:
 static void test_invalid_param_index(void) {
   struct ov_error err = {0};
   uint32_t sel_id = 0;
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
@@ -1649,7 +1649,7 @@ static void test_param_on_value_item(void) {
   struct ov_error err = {0};
   uint32_t sel_id = 0;
   uint32_t value_item_id = 0;
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
@@ -1678,7 +1678,7 @@ cleanup:
 static void test_load_basic(void) {
   struct ov_error err = {0};
   uint32_t sel_id = 0;
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   if (!TEST_SUCCEEDED(ptk_anm2_load(doc, test_data_basic, &err), &err)) {
@@ -1737,7 +1737,7 @@ cleanup:
 static void test_load_animation(void) {
   struct ov_error err = {0};
   uint32_t sel_id = 0;
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   if (!TEST_SUCCEEDED(ptk_anm2_load(doc, test_data_animation, &err), &err)) {
@@ -1807,7 +1807,7 @@ static void test_load_mixed(void) {
   struct ov_error err = {0};
   uint32_t sel1_id = 0;
   uint32_t sel2_id = 0;
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   if (!TEST_SUCCEEDED(ptk_anm2_load(doc, test_data_mixed, &err), &err)) {
@@ -1898,7 +1898,7 @@ static void test_save_load_roundtrip(void) {
   uint32_t loaded_sel1_id = 0;
   uint32_t loaded_sel2_id = 0;
 
-  doc = ptk_anm2_new(&err);
+  doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Create temp file path
@@ -1949,7 +1949,7 @@ static void test_save_load_roundtrip(void) {
   }
 
   // Create a new document and load
-  loaded_doc = ptk_anm2_new(&err);
+  loaded_doc = ptk_anm2_create(&err);
   if (!TEST_CHECK(loaded_doc != NULL)) {
     goto cleanup;
   }
@@ -2096,7 +2096,7 @@ static void test_load_clears_undo(void) {
   wchar_t temp_path[MAX_PATH] = {0};
   uint32_t sel_id = 0;
 
-  doc = ptk_anm2_new(&err);
+  doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Create temp file path
@@ -2160,7 +2160,7 @@ static void test_save_without_psd_path(void) {
   struct ptk_anm2 *doc = NULL;
   wchar_t temp_path[MAX_PATH] = {0};
 
-  doc = ptk_anm2_new(&err);
+  doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Create temp file path
@@ -2189,7 +2189,7 @@ static void test_save_load_empty_param_value(void) {
   uint32_t sel_id = 0;
   uint32_t anim_item_id = 0;
 
-  doc = ptk_anm2_new(&err);
+  doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Create temp file path
@@ -2234,7 +2234,7 @@ static void test_save_load_empty_param_value(void) {
   }
 
   // Create a new document and load
-  loaded_doc = ptk_anm2_new(&err);
+  loaded_doc = ptk_anm2_create(&err);
   if (!TEST_CHECK(loaded_doc != NULL)) {
     goto cleanup;
   }
@@ -2296,7 +2296,7 @@ cleanup:
 
 static void test_generate_script_single_selector(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   char *content = NULL;
@@ -2344,7 +2344,7 @@ cleanup:
 
 static void test_generate_script_multiple_selectors(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   char *content = NULL;
@@ -2415,7 +2415,7 @@ cleanup:
 
 static void test_generate_script_empty_selector_skipped(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   char *content = NULL;
@@ -2469,7 +2469,7 @@ cleanup:
 
 static void test_generate_script_animation_params(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   char *content = NULL;
@@ -2518,7 +2518,7 @@ cleanup:
 
 static void test_generate_script_null_param_value(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   char *content = NULL;
@@ -2566,7 +2566,7 @@ static void test_verify_checksum(void) {
   wchar_t temp_path[MAX_PATH] = {0};
   uint32_t sel_id = 0;
 
-  doc = ptk_anm2_new(&err);
+  doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Create temp file path
@@ -2593,7 +2593,7 @@ static void test_verify_checksum(void) {
   }
 
   // Load and verify checksum matches
-  loaded_doc = ptk_anm2_new(&err);
+  loaded_doc = ptk_anm2_create(&err);
   if (!TEST_CHECK(loaded_doc != NULL)) {
     goto cleanup;
   }
@@ -2617,7 +2617,7 @@ cleanup:
 
 static void test_item_set_script_name(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t anim_item_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
@@ -2649,7 +2649,7 @@ cleanup:
 
 static void test_item_set_script_name_on_value_item(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t value_item_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
@@ -2675,7 +2675,7 @@ cleanup:
 
 static void test_selector_set_group_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   char *content = NULL;
   uint32_t sel_id = 0;
   uint32_t anim_item_id = 0;
@@ -2885,7 +2885,7 @@ cleanup:
 
 static void test_item_set_name_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t item_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
@@ -2934,7 +2934,7 @@ cleanup:
 
 static void test_item_set_value_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t item_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
@@ -2983,7 +2983,7 @@ cleanup:
 
 static void test_item_set_script_name_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t anim_item_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
@@ -3032,7 +3032,7 @@ cleanup:
 
 static void test_param_set_key_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t anim_item_id = 0;
   uint32_t param_id = 0;
@@ -3077,7 +3077,7 @@ cleanup:
 
 static void test_param_set_value_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t anim_item_id = 0;
   uint32_t param_id = 0;
@@ -3122,7 +3122,7 @@ cleanup:
 
 static void test_selector_move_to_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t id_a = 0;
   uint32_t id_b = 0;
   uint32_t id_c = 0;
@@ -3177,7 +3177,7 @@ cleanup:
 
 static void test_item_move_after_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t item_id_a = 0;
   uint32_t item_id_c = 0;
@@ -3262,7 +3262,7 @@ cleanup:
 
 static void test_selector_remove_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t id1 = 0;
   uint32_t id2 = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
@@ -3329,7 +3329,7 @@ cleanup:
 
 static void test_item_remove_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   uint32_t sel_id = 0;
   uint32_t anim_item_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
@@ -3407,7 +3407,7 @@ cleanup:
 
 static void test_exclusive_support_default_default_value(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // New document should have exclusive_support_default = true
@@ -3418,7 +3418,7 @@ static void test_exclusive_support_default_default_value(void) {
 
 static void test_exclusive_support_default_set_get(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Set exclusive_support_default to false
@@ -3442,7 +3442,7 @@ cleanup:
 
 static void test_exclusive_support_default_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Initially true
@@ -3473,7 +3473,7 @@ cleanup:
 
 static void test_information_default_value(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // New document should have information = NULL (auto-generate)
@@ -3484,7 +3484,7 @@ static void test_information_default_value(void) {
 
 static void test_information_set_get(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Set custom information
@@ -3516,7 +3516,7 @@ cleanup:
 
 static void test_information_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Initially NULL
@@ -3563,7 +3563,7 @@ static void test_save_load_exclusive_support_and_information(void) {
   wchar_t temp_path[MAX_PATH] = {0};
   uint32_t sel_id = 0;
 
-  doc = ptk_anm2_new(&err);
+  doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   if (!TEST_CHECK(create_temp_path(temp_path, MAX_PATH))) {
@@ -3597,7 +3597,7 @@ static void test_save_load_exclusive_support_and_information(void) {
   }
 
   // Load into new document
-  loaded_doc = ptk_anm2_new(&err);
+  loaded_doc = ptk_anm2_create(&err);
   if (!TEST_CHECK(loaded_doc != NULL)) {
     goto cleanup;
   }
@@ -3627,7 +3627,7 @@ cleanup:
 
 static void test_generate_script_with_exclusive_support(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   char *content = NULL;
@@ -3677,7 +3677,7 @@ cleanup:
 
 static void test_generate_script_with_custom_information(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   char *content = NULL;
@@ -3725,7 +3725,7 @@ cleanup:
 
 static void test_load_assigns_ids(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   if (!TEST_SUCCEEDED(ptk_anm2_load(doc, test_data_mixed, &err), &err)) {
@@ -3818,7 +3818,7 @@ cleanup:
 static void test_undo_callback_selector_insert(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   ptk_anm2_set_change_callback(doc, test_change_callback_fn, &tracker);
@@ -3849,7 +3849,7 @@ static void test_undo_callback_selector_insert(void) {
 static void test_undo_callback_selector_remove(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   ptk_anm2_set_change_callback(doc, test_change_callback_fn, &tracker);
@@ -3882,7 +3882,7 @@ static void test_undo_callback_selector_remove(void) {
 static void test_undo_callback_item_insert(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
@@ -3917,7 +3917,7 @@ static void test_undo_callback_item_insert(void) {
 static void test_undo_callback_item_remove(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
@@ -3954,7 +3954,7 @@ static void test_undo_callback_item_remove(void) {
 static void test_undo_callback_param_insert(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
@@ -3992,7 +3992,7 @@ static void test_undo_callback_param_insert(void) {
 static void test_undo_callback_param_remove(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
@@ -4032,7 +4032,7 @@ static void test_undo_callback_param_remove(void) {
 static void test_undo_callback_selector_set_group(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
@@ -4064,7 +4064,7 @@ static void test_undo_callback_selector_set_group(void) {
 static void test_undo_callback_selector_move(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t sel1_id = ptk_anm2_selector_insert(doc, 0, "Sel1", &err);
@@ -4098,7 +4098,7 @@ static void test_undo_callback_selector_move(void) {
 static void test_undo_callback_item_set_name(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
@@ -4132,7 +4132,7 @@ static void test_undo_callback_item_set_name(void) {
 static void test_undo_callback_item_set_value(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
@@ -4166,7 +4166,7 @@ static void test_undo_callback_item_set_value(void) {
 static void test_undo_callback_item_set_script_name(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
@@ -4200,7 +4200,7 @@ static void test_undo_callback_item_set_script_name(void) {
 static void test_undo_callback_item_move(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
@@ -4239,7 +4239,7 @@ static void test_undo_callback_item_move(void) {
 static void test_undo_callback_param_set_key(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
@@ -4275,7 +4275,7 @@ static void test_undo_callback_param_set_key(void) {
 static void test_undo_callback_param_set_value(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
@@ -4311,7 +4311,7 @@ static void test_undo_callback_param_set_value(void) {
 static void test_undo_callback_set_label(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   ptk_anm2_set_change_callback(doc, test_change_callback_fn, &tracker);
@@ -4339,7 +4339,7 @@ static void test_undo_callback_set_label(void) {
 static void test_undo_callback_set_psd_path(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   ptk_anm2_set_change_callback(doc, test_change_callback_fn, &tracker);
@@ -4367,7 +4367,7 @@ static void test_undo_callback_set_psd_path(void) {
 static void test_undo_callback_set_exclusive(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   ptk_anm2_set_change_callback(doc, test_change_callback_fn, &tracker);
@@ -4395,7 +4395,7 @@ static void test_undo_callback_set_exclusive(void) {
 static void test_undo_callback_set_information(void) {
   struct ov_error err = {0};
   struct callback_tracker tracker = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   ptk_anm2_set_change_callback(doc, test_change_callback_fn, &tracker);
@@ -4423,7 +4423,7 @@ static void test_undo_callback_set_information(void) {
 // Test item_would_move for same position (no-op)
 static void test_item_would_move_same_position(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
@@ -4462,7 +4462,7 @@ static void test_item_would_move_same_position(void) {
 // Test item_would_move for actual moves
 static void test_item_would_move_actual_move(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
@@ -4493,7 +4493,7 @@ static void test_item_would_move_actual_move(void) {
 // Test selector_would_move for same position (no-op)
 static void test_selector_would_move_same_position(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t sel_a = ptk_anm2_selector_insert(doc, 0, "A", &err);
@@ -4522,7 +4522,7 @@ static void test_selector_would_move_same_position(void) {
 // Test selector_would_move for actual moves
 static void test_selector_would_move_actual_move(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   uint32_t sel_a = ptk_anm2_selector_insert(doc, 0, "A", &err);
@@ -4551,7 +4551,7 @@ static void test_selector_would_move_actual_move(void) {
 // Test default_character_id get/set
 static void test_default_character_id_set_get(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Initial value should be NULL
@@ -4586,7 +4586,7 @@ static void test_default_character_id_set_get(void) {
 // Test default_character_id undo/redo
 static void test_default_character_id_undo_redo(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Set character ID
@@ -4621,7 +4621,7 @@ static void test_save_load_multiscript(void) {
   wchar_t obj2_path[MAX_PATH] = {0};
   uint32_t sel_id = 0;
 
-  doc = ptk_anm2_new(&err);
+  doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Create temp file path with @ prefix
@@ -4664,7 +4664,7 @@ static void test_save_load_multiscript(void) {
   }
 
   // Load into new document
-  loaded_doc = ptk_anm2_new(&err);
+  loaded_doc = ptk_anm2_create(&err);
   if (!TEST_CHECK(loaded_doc != NULL)) {
     goto cleanup;
   }
@@ -4695,7 +4695,7 @@ static void test_save_load_multiscript(void) {
   }
 
   // Load .obj2 file and verify content
-  loaded_obj2_doc = ptk_anm2_new(&err);
+  loaded_obj2_doc = ptk_anm2_create(&err);
   if (!TEST_CHECK(loaded_obj2_doc != NULL)) {
     goto cleanup;
   }

@@ -5,35 +5,8 @@
 #include "alias.h"
 
 struct ptk_anm2editor;
+struct ptk_anm2_edit;
 struct aviutl2_edit_handle;
-
-/**
- * @brief Target item for ~ptkl parameter assignment
- *
- * Represents a parameter that ends with "~ptkl" suffix in an animation item.
- */
-struct ptk_anm2editor_ptkl_target {
-  char *selector_name; // Selector group name, e.g., "目パチ"
-  char *effect_name;   // Effect/item display name, e.g., "目パチ@PSDToolKit"
-  char *param_key;     // Parameter key, e.g., "開き~ptkl"
-  size_t sel_idx;      // Selector index
-  size_t item_idx;     // Item index within selector
-  size_t param_idx;    // Parameter index within item
-};
-
-/**
- * @brief Collection of ~ptkl targets
- */
-struct ptk_anm2editor_ptkl_targets {
-  struct ptk_anm2editor_ptkl_target *items; // ovarray
-};
-
-/**
- * @brief Free ptkl targets structure
- *
- * @param targets Targets to free
- */
-void ptk_anm2editor_ptkl_targets_free(struct ptk_anm2editor_ptkl_targets *targets);
 
 /**
  * @brief Create the PSDToolKit anm2 Editor instance
@@ -69,6 +42,14 @@ void ptk_anm2editor_destroy(struct ptk_anm2editor **editor);
 void *ptk_anm2editor_get_window(struct ptk_anm2editor *editor);
 
 /**
+ * @brief Get the underlying edit core
+ *
+ * @param editor Editor instance
+ * @return Edit core instance, or NULL if not initialized
+ */
+struct ptk_anm2_edit *ptk_anm2editor_get_edit(struct ptk_anm2editor *editor);
+
+/**
  * @brief Create a new empty document for editing
  *
  * Initializes the editor with an empty metadata structure.
@@ -78,7 +59,7 @@ void *ptk_anm2editor_get_window(struct ptk_anm2editor *editor);
  * @param err [out] Error information on failure
  * @return true on success, false on failure
  */
-NODISCARD bool ptk_anm2editor_new(struct ptk_anm2editor *editor, struct ov_error *err);
+NODISCARD bool ptk_anm2editor_new_document(struct ptk_anm2editor *editor, struct ov_error *err);
 
 /**
  * @brief Open an existing anm2 file for editing
@@ -133,24 +114,6 @@ bool ptk_anm2editor_is_modified(struct ptk_anm2editor *editor);
 bool ptk_anm2editor_is_open(struct ptk_anm2editor *editor);
 
 /**
- * @brief Get the current PSD file path
- *
- * @param editor Editor instance
- * @return PSD file path (UTF-8), or NULL if not set. Caller must NOT free this.
- */
-char const *ptk_anm2editor_get_psd_path(struct ptk_anm2editor *editor);
-
-/**
- * @brief Set the PSD file path
- *
- * @param editor Editor instance
- * @param path PSD file path (UTF-8)
- * @param err [out] Error information on failure
- * @return true on success, false on failure
- */
-NODISCARD bool ptk_anm2editor_set_psd_path(struct ptk_anm2editor *editor, char const *path, struct ov_error *err);
-
-/**
  * @brief Add a selector with value items to the editor
  *
  * Creates a new selector with the specified group name and adds value items
@@ -196,69 +159,3 @@ NODISCARD bool ptk_anm2editor_add_value_item_to_selected(struct ptk_anm2editor *
                                                          char const *name,
                                                          char const *value,
                                                          struct ov_error *err);
-
-/**
- * @brief Collect ~ptkl parameter targets from the currently selected selector
- *
- * Scans animation items in the currently selected selector for parameters
- * that end with "~ptkl" suffix. If no selector is selected, returns an empty result.
- *
- * @param editor Editor instance
- * @param targets [out] Output targets (caller must free with ptk_anm2editor_ptkl_targets_free)
- * @param err [out] Error information on failure
- * @return true on success, false on failure
- */
-NODISCARD bool ptk_anm2editor_collect_selected_ptkl_targets(struct ptk_anm2editor *editor,
-                                                            struct ptk_anm2editor_ptkl_targets *targets,
-                                                            struct ov_error *err);
-
-/**
- * @brief Set a parameter value in the editor
- *
- * Updates the specified parameter value and refreshes the UI.
- *
- * @param editor Editor instance
- * @param sel_idx Selector index
- * @param item_idx Item index within selector
- * @param param_idx Parameter index within item
- * @param value New value to set (UTF-8)
- * @param err [out] Error information on failure
- * @return true on success, false on failure
- */
-NODISCARD bool ptk_anm2editor_set_param_value(struct ptk_anm2editor *editor,
-                                              size_t sel_idx,
-                                              size_t item_idx,
-                                              size_t param_idx,
-                                              char const *value,
-                                              struct ov_error *err);
-
-/**
- * @brief Get the index of the currently selected selector
- *
- * @param editor Editor instance
- * @return Index of the selected selector, or SIZE_MAX if no selector is selected
- */
-size_t ptk_anm2editor_get_selected_selector_index(struct ptk_anm2editor *editor);
-
-/**
- * @brief Add an animation item to the editor
- *
- * Adds an animation item (e.g., Blinker, LipSync) to the specified selector.
- * The item is inserted at the beginning of the selector's item list.
- *
- * @param editor Editor instance
- * @param sel_idx Selector index (use ptk_anm2editor_get_selected_selector_index() or 0)
- * @param script_name Script name (e.g., "PSDToolKit.Blinker")
- * @param display_name Display name (e.g., "目パチ@PSDToolKit")
- * @param params Array of parameter key-value pairs
- * @param param_count Number of parameters
- * @param err [out] Error information on failure
- * @return true on success, false on failure
- */
-NODISCARD bool ptk_anm2editor_add_animation_item(struct ptk_anm2editor *editor,
-                                                 size_t sel_idx,
-                                                 char const *script_name,
-                                                 char const *display_name,
-                                                 struct ptk_alias_extracted_param const *params,
-                                                 size_t param_count,
-                                                 struct ov_error *err);

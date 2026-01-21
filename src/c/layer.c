@@ -12,6 +12,7 @@
 
 #include <aviutl2_plugin2.h>
 
+#include "anm2_edit.h"
 #include "anm2editor.h"
 #include "error.h"
 #include "ini_reader.h"
@@ -910,7 +911,7 @@ enum menu_cmd {
  * @param selected_idx Index of the selected item
  * @param targets Available ptkl assignment targets (can be NULL if error occurred)
  * @param targets_error_message Error message to show instead of targets (can be NULL)
- * @param anm2editor_selected_targets ptkl targets from currently selected selector in anm2editor (can be NULL)
+ * @param anm2edit_selected_targets ptkl targets from currently selected selector in anm2_edit (can be NULL)
  * @param anm2editor_open Whether anm2editor is open
  * @param err Error information
  * @return true on success, false on failure
@@ -920,7 +921,7 @@ static bool build_popup_menu(HMENU *const menu,
                              size_t const selected_idx,
                              struct ptkl_targets const *const targets,
                              wchar_t const *const targets_error_message,
-                             struct ptk_anm2editor_ptkl_targets const *const anm2editor_selected_targets,
+                             struct ptk_anm2_edit_ptkl_targets const *const anm2edit_selected_targets,
                              bool const anm2editor_open,
                              struct ov_error *const err) {
   char *item_name = NULL;
@@ -1023,8 +1024,8 @@ static bool build_popup_menu(HMENU *const menu,
   // Structure: effect_name -> param_key
   if (anm2editor_open) {
     AppendMenuW(*menu, MF_SEPARATOR, 0, NULL);
-    if (anm2editor_selected_targets && OV_ARRAY_LENGTH(anm2editor_selected_targets->items) > 0) {
-      size_t const targets_len = OV_ARRAY_LENGTH(anm2editor_selected_targets->items);
+    if (anm2edit_selected_targets && OV_ARRAY_LENGTH(anm2edit_selected_targets->items) > 0) {
+      size_t const targets_len = OV_ARRAY_LENGTH(anm2edit_selected_targets->items);
       struct {
         char const *name;
         HMENU menu;
@@ -1032,7 +1033,7 @@ static bool build_popup_menu(HMENU *const menu,
       size_t submenu_count = 0;
 
       for (size_t i = 0; i < targets_len && i < 64; i++) {
-        struct ptk_anm2editor_ptkl_target const *const t = &anm2editor_selected_targets->items[i];
+        struct ptk_anm2_edit_ptkl_target const *const t = &anm2edit_selected_targets->items[i];
 
         HMENU submenu = NULL;
         for (size_t j = 0; j < submenu_count; j++) {
@@ -1227,7 +1228,7 @@ static void process_export_common(HWND const hwnd,
 
   struct ov_error err = {0};
   struct collect_targets_context target_ctx = {.err = &err};
-  struct ptk_anm2editor_ptkl_targets anm2editor_selected_targets = {0};
+  struct ptk_anm2_edit_ptkl_targets anm2edit_selected_targets = {0};
   HMENU hmenu = NULL;
   size_t *sibling_indices = NULL;
   char *clipboard_text = NULL;
@@ -1242,10 +1243,11 @@ static void process_export_common(HWND const hwnd,
     OV_ERROR_DESTROY(&err);
   }
 
-  // Collect anm2editor ptkl targets from selected selector
+  // Collect anm2_edit ptkl targets from selected selector
   bool const anm2editor_open = anm2editor && ptk_anm2editor_is_open(anm2editor);
-  if (anm2editor_open) {
-    if (!ptk_anm2editor_collect_selected_ptkl_targets(anm2editor, &anm2editor_selected_targets, &err)) {
+  struct ptk_anm2_edit *anm2edit_core = anm2editor ? ptk_anm2editor_get_edit(anm2editor) : NULL;
+  if (anm2editor_open && anm2edit_core) {
+    if (!ptk_anm2_edit_collect_ptkl_targets(anm2edit_core, &anm2edit_selected_targets, &err)) {
       OV_ERROR_DESTROY(&err);
     }
   }
@@ -1255,7 +1257,7 @@ static void process_export_common(HWND const hwnd,
                         selected_idx,
                         target_ctx.success ? &target_ctx.targets : NULL,
                         targets_error_message,
-                        &anm2editor_selected_targets,
+                        &anm2edit_selected_targets,
                         anm2editor_open,
                         &err)) {
     OV_ERROR_ADD_TRACE(&err);
@@ -1318,11 +1320,10 @@ static void process_export_common(HWND const hwnd,
                cmd < menu_cmd_anm2editor_selected_assign_base + 100) {
       current_op = op_anm2editor_assign;
       size_t const target_idx = cmd - menu_cmd_anm2editor_selected_assign_base;
-      size_t const targets_len = OV_ARRAY_LENGTH(anm2editor_selected_targets.items);
-      if (target_idx < targets_len) {
-        struct ptk_anm2editor_ptkl_target const *const t = &anm2editor_selected_targets.items[target_idx];
-        if (!ptk_anm2editor_set_param_value(
-                anm2editor, t->sel_idx, t->item_idx, t->param_idx, li->items[selected_idx].value, &err)) {
+      size_t const targets_len = OV_ARRAY_LENGTH(anm2edit_selected_targets.items);
+      if (target_idx < targets_len && anm2edit_core) {
+        struct ptk_anm2_edit_ptkl_target const *const t = &anm2edit_selected_targets.items[target_idx];
+        if (!ptk_anm2_edit_set_param_value_by_id(anm2edit_core, t->param_id, li->items[selected_idx].value, &err)) {
           OV_ERROR_ADD_TRACE(&err);
           goto cleanup;
         }
@@ -1352,7 +1353,7 @@ static void process_export_common(HWND const hwnd,
   }
 
 cleanup:
-  ptk_anm2editor_ptkl_targets_free(&anm2editor_selected_targets);
+  ptk_anm2_edit_ptkl_targets_free(&anm2edit_selected_targets);
   if (targets_error_message) {
     OV_ARRAY_DESTROY(&targets_error_message);
   }

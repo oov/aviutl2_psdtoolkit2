@@ -13,9 +13,6 @@
 
 #include "ini_reader.h"
 
-// Forward declaration for DLL module lookup
-extern bool ovl_os_get_hinstance_from_fnptr(void *fn, void **hinstance, struct ov_error *err);
-
 /**
  * @brief Copy a string with length
  *

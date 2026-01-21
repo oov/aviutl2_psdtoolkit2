@@ -2,6 +2,7 @@
 // We need to include headers first, then provide stub implementations
 
 #include "anm2.h"
+#include "anm2_edit.h"
 #include "anm2editor.h"
 #include "dialog.h"
 #include "error.h"
@@ -47,7 +48,7 @@ int ptk_error_dialog(HWND owner,
 }
 
 // Stub implementations for anm2 functions
-struct ptk_anm2 *ptk_anm2_new(struct ov_error *const err) {
+struct ptk_anm2 *ptk_anm2_create(struct ov_error *const err) {
   (void)err;
   return NULL;
 }
@@ -130,16 +131,9 @@ bool ptk_anm2editor_is_open(struct ptk_anm2editor *editor) {
   return false;
 }
 
-char const *ptk_anm2editor_get_psd_path(struct ptk_anm2editor *editor) {
+struct ptk_anm2_edit *ptk_anm2editor_get_edit(struct ptk_anm2editor *editor) {
   (void)editor;
   return NULL;
-}
-
-bool ptk_anm2editor_set_psd_path(struct ptk_anm2editor *editor, char const *path, struct ov_error *err) {
-  (void)editor;
-  (void)path;
-  (void)err;
-  return false;
 }
 
 bool ptk_anm2editor_add_value_items(struct ptk_anm2editor *editor,
@@ -174,59 +168,12 @@ bool ptk_anm2editor_add_value_item_to_selected(struct ptk_anm2editor *editor,
   return false;
 }
 
-bool ptk_anm2editor_collect_selected_ptkl_targets(struct ptk_anm2editor *editor,
-                                                  struct ptk_anm2editor_ptkl_targets *targets,
-                                                  struct ov_error *err) {
-  (void)editor;
-  (void)err;
-  if (targets) {
-    *targets = (struct ptk_anm2editor_ptkl_targets){0};
-  }
-  return true;
-}
-
-bool ptk_anm2editor_set_param_value(struct ptk_anm2editor *editor,
-                                    size_t sel_idx,
-                                    size_t item_idx,
-                                    size_t param_idx,
-                                    char const *value,
-                                    struct ov_error *err) {
-  (void)editor;
-  (void)sel_idx;
-  (void)item_idx;
-  (void)param_idx;
-  (void)value;
-  (void)err;
-  return false;
-}
-
-size_t ptk_anm2editor_get_selected_selector_index(struct ptk_anm2editor *editor) {
-  (void)editor;
-  return SIZE_MAX;
-}
-
-bool ptk_anm2editor_add_animation_item(struct ptk_anm2editor *editor,
-                                       size_t sel_idx,
-                                       char const *script_name,
-                                       char const *display_name,
-                                       struct ptk_alias_extracted_param const *params,
-                                       size_t param_count,
-                                       struct ov_error *err) {
-  (void)editor;
-  (void)sel_idx;
-  (void)script_name;
-  (void)display_name;
-  (void)params;
-  (void)param_count;
-  (void)err;
-  return false;
-}
-
-void ptk_anm2editor_ptkl_targets_free(struct ptk_anm2editor_ptkl_targets *targets) {
+// Stub implementations for anm2_edit ptkl functions
+void ptk_anm2_edit_ptkl_targets_free(struct ptk_anm2_edit_ptkl_targets *targets) {
   if (targets && targets->items) {
     size_t const len = OV_ARRAY_LENGTH(targets->items);
     for (size_t i = 0; i < len; i++) {
-      struct ptk_anm2editor_ptkl_target *t = &targets->items[i];
+      struct ptk_anm2_edit_ptkl_target *t = &targets->items[i];
       if (t->selector_name) {
         OV_ARRAY_DESTROY(&t->selector_name);
       }
@@ -240,8 +187,30 @@ void ptk_anm2editor_ptkl_targets_free(struct ptk_anm2editor_ptkl_targets *target
     OV_ARRAY_DESTROY(&targets->items);
   }
   if (targets) {
-    *targets = (struct ptk_anm2editor_ptkl_targets){0};
+    *targets = (struct ptk_anm2_edit_ptkl_targets){0};
   }
+}
+
+bool ptk_anm2_edit_collect_ptkl_targets(struct ptk_anm2_edit *edit,
+                                        struct ptk_anm2_edit_ptkl_targets *targets,
+                                        struct ov_error *err) {
+  (void)edit;
+  (void)err;
+  if (targets) {
+    *targets = (struct ptk_anm2_edit_ptkl_targets){0};
+  }
+  return true;
+}
+
+bool ptk_anm2_edit_set_param_value_by_id(struct ptk_anm2_edit *edit,
+                                         uint32_t param_id,
+                                         char const *value,
+                                         struct ov_error *err) {
+  (void)edit;
+  (void)param_id;
+  (void)value;
+  (void)err;
+  return false;
 }
 
 // Include layer.c directly to test static functions

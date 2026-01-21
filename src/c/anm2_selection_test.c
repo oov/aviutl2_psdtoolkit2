@@ -15,7 +15,7 @@ static bool selection_contains(uint32_t const *ids, size_t count, uint32_t id) {
 
 static void test_selection_create_destroy(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   struct anm2_selection *sel = NULL;
 
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
@@ -44,7 +44,7 @@ static void test_selection_create_destroy(void) {
 
 static void test_selection_set_focus_selector(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   struct anm2_selection *sel = NULL;
 
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
@@ -76,7 +76,7 @@ static void test_selection_set_focus_selector(void) {
 
 static void test_selection_set_focus_item_update_anchor(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   struct anm2_selection *sel = NULL;
   uint32_t sel_id = 0;
 
@@ -119,7 +119,7 @@ static void test_selection_set_focus_item_update_anchor(void) {
 
 static void test_selection_apply_treeview_selection_basic(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   struct anm2_selection *sel = NULL;
   uint32_t sel_id = 0;
 
@@ -187,7 +187,7 @@ static void test_selection_apply_treeview_selection_basic(void) {
 
 static void test_selection_apply_treeview_selector(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   struct anm2_selection *sel = NULL;
 
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
@@ -231,7 +231,7 @@ static void test_selection_apply_treeview_selector(void) {
 
 static void test_selection_apply_range_across_selectors(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   struct anm2_selection *sel = NULL;
   uint32_t sel_a = 0;
   uint32_t sel_b = 0;
@@ -270,7 +270,7 @@ static void test_selection_apply_range_across_selectors(void) {
 
 static void test_selection_replace_selected_items(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   struct anm2_selection *sel = NULL;
   uint32_t sel_id = 0;
 
@@ -306,7 +306,7 @@ static void test_selection_replace_selected_items(void) {
 
 static void test_selection_refresh_invalid_anchor(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   struct anm2_selection *sel = NULL;
   uint32_t sel_id = 0;
 
@@ -345,7 +345,7 @@ static void test_selection_refresh_invalid_anchor(void) {
 
 static void test_selection_refresh_focus_removed(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   struct anm2_selection *sel = NULL;
   uint32_t sel_id = 0;
 
@@ -377,7 +377,7 @@ static void test_selection_refresh_focus_removed(void) {
 
 static void test_selection_refresh_selector_focus_removed(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   struct anm2_selection *sel = NULL;
 
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
@@ -409,7 +409,7 @@ static void test_selection_refresh_selector_focus_removed(void) {
 
 static void test_selection_multisel_partial_remove(void) {
   struct ov_error err = {0};
-  struct ptk_anm2 *doc = ptk_anm2_new(&err);
+  struct ptk_anm2 *doc = ptk_anm2_create(&err);
   struct anm2_selection *sel = NULL;
   uint32_t sel_id = 0;
 

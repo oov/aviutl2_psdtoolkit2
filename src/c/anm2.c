@@ -1021,6 +1021,8 @@ bool ptk_anm2_reset(struct ptk_anm2 *doc, struct ov_error *const err) {
     return false;
   }
 
+  bool success = false;
+
   // Save callbacks before cleanup
   ptk_anm2_change_callback const cb = doc->change_callback;
   void *const cb_userdata = doc->change_callback_userdata;
@@ -1042,17 +1044,20 @@ bool ptk_anm2_reset(struct ptk_anm2 *doc, struct ov_error *const err) {
   };
   if (!strdup_to_array(&doc->label, pgettext(".ptk.anm2 label", "PSD"), err)) {
     OV_ERROR_ADD_TRACE(err);
-    return false;
+    goto cleanup;
   }
 
   // Notify change
   notify_change(doc, ptk_anm2_op_reset, 0, 0, 0);
   notify_state(doc);
 
-  return true;
+  success = true;
+
+cleanup:
+  return success;
 }
 
-struct ptk_anm2 *ptk_anm2_new(struct ov_error *const err) {
+struct ptk_anm2 *ptk_anm2_create(struct ov_error *const err) {
   struct ptk_anm2 *doc = NULL;
   bool success = false;
 
@@ -1095,14 +1100,20 @@ char const *ptk_anm2_get_label(struct ptk_anm2 const *doc) {
 }
 
 static bool push_undo_op(struct ptk_anm2 *doc, struct ptk_anm2_op const *op, struct ov_error *const err) {
+  bool success = false;
+
   size_t const len = OV_ARRAY_LENGTH(doc->undo_stack);
   if (!OV_ARRAY_GROW(&doc->undo_stack, len + 1)) {
     OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
-    return false;
+    goto cleanup;
   }
   doc->undo_stack[len] = *op;
   OV_ARRAY_SET_LENGTH(doc->undo_stack, len + 1);
-  return true;
+
+  success = true;
+
+cleanup:
+  return success;
 }
 
 static void clear_redo_stack(struct ptk_anm2 *doc) { op_stack_clear(&doc->redo_stack); }
@@ -4125,6 +4136,94 @@ uint32_t ptk_anm2_param_get_id(struct ptk_anm2 const *doc, size_t sel_idx, size_
     return 0;
   }
   return it->params[param_idx].id;
+}
+
+uint32_t *ptk_anm2_get_item_ids(struct ptk_anm2 const *doc, uint32_t selector_id, struct ov_error *const err) {
+  if (!doc || selector_id == 0) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
+    return NULL;
+  }
+
+  uint32_t *ids = NULL;
+  size_t sel_idx = 0;
+
+  if (!ptk_anm2_find_selector(doc, selector_id, &sel_idx)) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
+    return NULL;
+  }
+
+  struct selector const *sel = &doc->selectors[sel_idx];
+  if (sel->items) {
+    size_t const n = OV_ARRAY_LENGTH(sel->items);
+    if (!OV_ARRAY_GROW(&ids, n)) {
+      OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+      return NULL;
+    }
+    for (size_t i = 0; i < n; i++) {
+      ids[i] = sel->items[i].id;
+    }
+    OV_ARRAY_SET_LENGTH(ids, n);
+  }
+
+  return ids;
+}
+
+uint32_t *ptk_anm2_get_param_ids(struct ptk_anm2 const *doc, uint32_t item_id, struct ov_error *const err) {
+  if (!doc || item_id == 0) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
+    return NULL;
+  }
+
+  uint32_t *ids = NULL;
+  size_t sel_idx = 0;
+  size_t item_idx = 0;
+
+  if (!ptk_anm2_find_item(doc, item_id, &sel_idx, &item_idx)) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
+    return NULL;
+  }
+
+  struct item const *it = &doc->selectors[sel_idx].items[item_idx];
+  if (it->params) {
+    size_t const n = OV_ARRAY_LENGTH(it->params);
+    if (!OV_ARRAY_GROW(&ids, n)) {
+      OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+      return NULL;
+    }
+    for (size_t i = 0; i < n; i++) {
+      ids[i] = it->params[i].id;
+    }
+    OV_ARRAY_SET_LENGTH(ids, n);
+  }
+
+  return ids;
+}
+
+uint32_t ptk_anm2_param_get_item_id(struct ptk_anm2 const *doc, uint32_t param_id) {
+  if (!doc || !doc->selectors || param_id == 0) {
+    return 0;
+  }
+  size_t const sel_count = OV_ARRAY_LENGTH(doc->selectors);
+  for (size_t i = 0; i < sel_count; i++) {
+    struct selector const *sel = &doc->selectors[i];
+    if (!sel->items) {
+      continue;
+    }
+    size_t const item_count = OV_ARRAY_LENGTH(sel->items);
+    for (size_t j = 0; j < item_count; j++) {
+      struct item const *it = &sel->items[j];
+      if (!it->params) {
+        continue;
+      }
+      size_t const param_count = OV_ARRAY_LENGTH(it->params);
+      for (size_t k = 0; k < param_count; k++) {
+        if (it->params[k].id == param_id) {
+          return it->id;
+        }
+      }
+    }
+  }
+  return 0;
 }
 
 static uintptr_t param_get_userdata(struct ptk_anm2 const *doc, size_t sel_idx, size_t item_idx, size_t param_idx) {

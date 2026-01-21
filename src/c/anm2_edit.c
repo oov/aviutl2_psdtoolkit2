@@ -118,32 +118,19 @@ static void on_state_change_internal(void *userdata) {
   notify_state_changes(edit);
 }
 
-NODISCARD struct ptk_anm2_edit *ptk_anm2_edit_new(struct ov_error *err) {
-  struct ptk_anm2 *doc = ptk_anm2_new(err);
-  if (!doc) {
-    OV_ERROR_ADD_TRACE(err);
-    return NULL;
-  }
-  struct ptk_anm2_edit *edit = ptk_anm2_edit_create(doc, err);
-  if (!edit) {
-    OV_ERROR_ADD_TRACE(err);
-    ptk_anm2_destroy(&doc);
-    return NULL;
-  }
-  return edit;
-}
-
-NODISCARD struct ptk_anm2_edit *ptk_anm2_edit_create(struct ptk_anm2 *doc, struct ov_error *err) {
+NODISCARD struct ptk_anm2_edit *ptk_anm2_edit_create(struct ov_error *err) {
   struct ptk_anm2_edit *out = NULL;
+  struct ptk_anm2 *doc = NULL;
 
+  doc = ptk_anm2_create(err);
   if (!doc) {
-    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
-    return NULL;
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
   }
 
   if (!OV_REALLOC(&out, 1, sizeof(*out))) {
     OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
-    return NULL;
+    goto cleanup;
   }
   *out = (struct ptk_anm2_edit){
       .doc = doc,
@@ -151,8 +138,8 @@ NODISCARD struct ptk_anm2_edit *ptk_anm2_edit_create(struct ptk_anm2 *doc, struc
 
   out->selection = anm2_selection_create(doc, err);
   if (!out->selection) {
-    OV_FREE(&out);
-    return NULL;
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
   }
 
   // Register internal callbacks to receive document changes
@@ -160,6 +147,13 @@ NODISCARD struct ptk_anm2_edit *ptk_anm2_edit_create(struct ptk_anm2 *doc, struc
   ptk_anm2_set_state_callback(doc, on_state_change_internal, out);
 
   return out;
+
+cleanup:
+  if (out) {
+    OV_FREE(&out);
+  }
+  ptk_anm2_destroy(&doc);
+  return NULL;
 }
 
 void ptk_anm2_edit_destroy(struct ptk_anm2_edit **edit) {
@@ -177,6 +171,8 @@ void ptk_anm2_edit_destroy(struct ptk_anm2_edit **edit) {
   OV_FREE(&p);
   *edit = NULL;
 }
+
+struct ptk_anm2 const *ptk_anm2_edit_get_doc(struct ptk_anm2_edit const *edit) { return edit ? edit->doc : NULL; }
 
 void ptk_anm2_edit_set_view_callback(struct ptk_anm2_edit *edit, ptk_anm2_edit_view_callback callback, void *userdata) {
   if (!edit) {
@@ -1281,6 +1277,8 @@ NODISCARD bool ptk_anm2_edit_undo(struct ptk_anm2_edit *edit, struct ov_error *e
   if (!ptk_anm2_can_undo(edit->doc)) {
     return true;
   }
+  // Notify views to save transient UI state before undo
+  notify_view(edit, &(struct ptk_anm2_edit_view_event){.op = ptk_anm2_edit_view_before_undo_redo});
   // ptk_anm2_undo will fire change_callback for each operation.
   // For grouped operations: GROUP_END first (depth--), then ops, then GROUP_BEGIN (depth++, rebuild).
   // For single operations: just the op (differential update).
@@ -1301,6 +1299,8 @@ NODISCARD bool ptk_anm2_edit_redo(struct ptk_anm2_edit *edit, struct ov_error *e
   if (!ptk_anm2_can_redo(edit->doc)) {
     return true;
   }
+  // Notify views to save transient UI state before redo
+  notify_view(edit, &(struct ptk_anm2_edit_view_event){.op = ptk_anm2_edit_view_before_undo_redo});
   // ptk_anm2_redo will fire change_callback for each operation.
   // Redo stack has ops in reverse order, so: GROUP_END first (depth--), then ops, then GROUP_BEGIN (depth++, rebuild).
   // For single operations: just the op (differential update).
@@ -1344,7 +1344,7 @@ ov_tribool ptk_anm2_edit_verify_file_checksum(wchar_t const *path, struct ov_err
     OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
     return ov_indeterminate;
   }
-  struct ptk_anm2 *temp_doc = ptk_anm2_new(err);
+  struct ptk_anm2 *temp_doc = ptk_anm2_create(err);
   if (!temp_doc) {
     OV_ERROR_ADD_TRACE(err);
     return ov_indeterminate;
@@ -1462,4 +1462,220 @@ void ptk_anm2_edit_get_editable_name(
   } else {
     out[0] = L'\0';
   }
+}
+
+void ptk_anm2_edit_ptkl_targets_free(struct ptk_anm2_edit_ptkl_targets *targets) {
+  if (!targets || !targets->items) {
+    return;
+  }
+  size_t const n = OV_ARRAY_LENGTH(targets->items);
+  for (size_t i = 0; i < n; i++) {
+    struct ptk_anm2_edit_ptkl_target *t = &targets->items[i];
+    if (t->selector_name) {
+      OV_ARRAY_DESTROY(&t->selector_name);
+    }
+    if (t->effect_name) {
+      OV_ARRAY_DESTROY(&t->effect_name);
+    }
+    if (t->param_key) {
+      OV_ARRAY_DESTROY(&t->param_key);
+    }
+  }
+  OV_ARRAY_DESTROY(&targets->items);
+  *targets = (struct ptk_anm2_edit_ptkl_targets){0};
+}
+
+static bool strdup_to_array_internal(char **out, char const *src, struct ov_error *const err) {
+  if (!src || src[0] == '\0') {
+    *out = NULL;
+    return true;
+  }
+
+  bool success = false;
+
+  size_t const len = strlen(src);
+  if (!OV_ARRAY_GROW(out, len + 1)) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+    goto cleanup;
+  }
+  memcpy(*out, src, len + 1);
+  OV_ARRAY_SET_LENGTH(*out, len);
+
+  success = true;
+
+cleanup:
+  return success;
+}
+
+static bool add_ptkl_target_internal(struct ptk_anm2_edit_ptkl_targets *targets,
+                                     char const *selector_name,
+                                     char const *effect_name,
+                                     char const *param_key,
+                                     uint32_t selector_id,
+                                     uint32_t item_id,
+                                     uint32_t param_id,
+                                     struct ov_error *const err) {
+  bool success = false;
+  struct ptk_anm2_edit_ptkl_target *t = NULL;
+
+  size_t const current_len = OV_ARRAY_LENGTH(targets->items);
+  if (!OV_ARRAY_GROW(&targets->items, current_len + 1)) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+    goto cleanup;
+  }
+
+  t = &targets->items[current_len];
+  *t = (struct ptk_anm2_edit_ptkl_target){
+      .selector_id = selector_id,
+      .item_id = item_id,
+      .param_id = param_id,
+  };
+
+  if (!strdup_to_array_internal(&t->selector_name, selector_name, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+  if (!strdup_to_array_internal(&t->effect_name, effect_name, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+  if (!strdup_to_array_internal(&t->param_key, param_key, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
+  OV_ARRAY_SET_LENGTH(targets->items, current_len + 1);
+  success = true;
+
+cleanup:
+  return success;
+}
+
+bool ptk_anm2_edit_collect_ptkl_targets(struct ptk_anm2_edit *edit,
+                                        struct ptk_anm2_edit_ptkl_targets *targets,
+                                        struct ov_error *const err) {
+  if (!edit || !targets) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
+    return false;
+  }
+
+  bool success = false;
+  uint32_t *item_ids = NULL;
+  uint32_t *param_ids = NULL;
+  *targets = (struct ptk_anm2_edit_ptkl_targets){0};
+
+  // Get current focus
+  struct ptk_anm2_edit_state state = {0};
+  ptk_anm2_edit_get_state(edit, &state);
+
+  // Need a selector to be focused (either directly or via an item)
+  uint32_t selector_id = 0;
+  if (state.focus_type == ptk_anm2_edit_focus_selector) {
+    selector_id = state.focus_id;
+  } else if (state.focus_type == ptk_anm2_edit_focus_item) {
+    // Find selector containing this item
+    size_t sel_idx = 0;
+    size_t item_idx = 0;
+    if (ptk_anm2_edit_find_item(edit, state.focus_id, &sel_idx, &item_idx)) {
+      selector_id = ptk_anm2_edit_selector_get_id(edit, sel_idx);
+    }
+  }
+
+  if (selector_id == 0) {
+    // No selector focused - return empty result (not an error)
+    success = true;
+    goto cleanup;
+  }
+
+  {
+    char const *group = ptk_anm2_selector_get_name(edit->doc, selector_id);
+
+    // Get all item IDs for this selector
+    item_ids = ptk_anm2_get_item_ids(edit->doc, selector_id, err);
+    if (!item_ids) {
+      // If selector exists but has no items, this is not an error
+      if (ptk_anm2_item_count(edit->doc, selector_id) == 0) {
+        OV_ERROR_DESTROY(err);
+        success = true;
+        goto cleanup;
+      }
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+
+    size_t const item_count = OV_ARRAY_LENGTH(item_ids);
+    for (size_t i = 0; i < item_count; i++) {
+      uint32_t const item_id = item_ids[i];
+      if (!ptk_anm2_item_is_animation(edit->doc, item_id)) {
+        continue;
+      }
+
+      char const *name = ptk_anm2_item_get_name(edit->doc, item_id);
+
+      // Get all parameter IDs for this item
+      if (param_ids) {
+        OV_ARRAY_DESTROY(&param_ids);
+      }
+      param_ids = ptk_anm2_get_param_ids(edit->doc, item_id, err);
+      if (!param_ids) {
+        // If item exists but has no params, this is not an error
+        if (ptk_anm2_param_count(edit->doc, item_id) == 0) {
+          OV_ERROR_DESTROY(err);
+          continue;
+        }
+        OV_ERROR_ADD_TRACE(err);
+        goto cleanup;
+      }
+
+      size_t const param_count = OV_ARRAY_LENGTH(param_ids);
+      for (size_t j = 0; j < param_count; j++) {
+        uint32_t const param_id = param_ids[j];
+        char const *key = ptk_anm2_param_get_key(edit->doc, param_id);
+        if (!key) {
+          continue;
+        }
+
+        // Check if key ends with "~ptkl"
+        size_t const key_len = strlen(key);
+        if (key_len < 5 || strcmp(key + key_len - 5, "~ptkl") != 0) {
+          continue;
+        }
+
+        if (!add_ptkl_target_internal(targets, group, name, key, selector_id, item_id, param_id, err)) {
+          OV_ERROR_ADD_TRACE(err);
+          ptk_anm2_edit_ptkl_targets_free(targets);
+          goto cleanup;
+        }
+      }
+    }
+  }
+
+  success = true;
+
+cleanup:
+  if (item_ids) {
+    OV_ARRAY_DESTROY(&item_ids);
+  }
+  if (param_ids) {
+    OV_ARRAY_DESTROY(&param_ids);
+  }
+  return success;
+}
+
+bool ptk_anm2_edit_set_param_value_by_id(struct ptk_anm2_edit *edit,
+                                         uint32_t param_id,
+                                         char const *value,
+                                         struct ov_error *const err) {
+  if (!edit || !edit->doc) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
+    return false;
+  }
+
+  // Use existing param_set_value which accepts param_id
+  if (!ptk_anm2_edit_param_set_value(edit, param_id, value, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    return false;
+  }
+
+  return true;
 }

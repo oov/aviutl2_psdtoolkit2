@@ -36,6 +36,7 @@ enum ptk_anm2_edit_view_op {
   ptk_anm2_edit_view_undo_redo_state_changed, // can_undo or can_redo changed
   ptk_anm2_edit_view_modified_state_changed,  // modified flag changed
   ptk_anm2_edit_view_save_state_changed,      // can_save changed
+  ptk_anm2_edit_view_before_undo_redo,        // About to perform undo/redo - save transient UI state
 };
 
 // View update event
@@ -51,13 +52,13 @@ struct ptk_anm2_edit_view_event {
 // View callback function type
 typedef void (*ptk_anm2_edit_view_callback)(void *userdata, struct ptk_anm2_edit_view_event const *event);
 
-// Create anm2_edit with a new empty document (anm2_edit owns the document)
-NODISCARD struct ptk_anm2_edit *ptk_anm2_edit_new(struct ov_error *err);
-
-// Create anm2_edit with an existing document (caller retains ownership of doc)
-NODISCARD struct ptk_anm2_edit *ptk_anm2_edit_create(struct ptk_anm2 *doc, struct ov_error *err);
+// Create anm2_edit with a new empty document
+NODISCARD struct ptk_anm2_edit *ptk_anm2_edit_create(struct ov_error *err);
 
 void ptk_anm2_edit_destroy(struct ptk_anm2_edit **edit);
+
+// Get the underlying document (read-only)
+struct ptk_anm2 const *ptk_anm2_edit_get_doc(struct ptk_anm2_edit const *edit);
 
 // Set view callback to receive differential updates
 void ptk_anm2_edit_set_view_callback(struct ptk_anm2_edit *edit, ptk_anm2_edit_view_callback callback, void *userdata);
@@ -210,3 +211,61 @@ NODISCARD bool ptk_anm2_edit_load(struct ptk_anm2_edit *edit, wchar_t const *pat
 NODISCARD bool ptk_anm2_edit_save(struct ptk_anm2_edit *edit, wchar_t const *path, struct ov_error *err);
 NODISCARD bool ptk_anm2_edit_reset(struct ptk_anm2_edit *edit, struct ov_error *err);
 bool ptk_anm2_edit_verify_checksum(struct ptk_anm2_edit const *edit);
+
+/**
+ * @brief Target item for ~ptkl parameter assignment
+ *
+ * Represents a parameter that ends with "~ptkl" suffix in an animation item.
+ * Uses ID-based references for stability across UNDO/REDO operations.
+ */
+struct ptk_anm2_edit_ptkl_target {
+  char *selector_name; // Selector group name, e.g., "目パチ" (ovarray)
+  char *effect_name;   // Effect/item display name, e.g., "目パチ@PSDToolKit" (ovarray)
+  char *param_key;     // Parameter key, e.g., "開き~ptkl" (ovarray)
+  uint32_t selector_id;
+  uint32_t item_id;
+  uint32_t param_id;
+};
+
+/**
+ * @brief Collection of ~ptkl targets
+ */
+struct ptk_anm2_edit_ptkl_targets {
+  struct ptk_anm2_edit_ptkl_target *items; // ovarray
+};
+
+/**
+ * @brief Free ptkl targets structure
+ *
+ * @param targets Targets to free
+ */
+void ptk_anm2_edit_ptkl_targets_free(struct ptk_anm2_edit_ptkl_targets *targets);
+
+/**
+ * @brief Collect ~ptkl parameter targets from the currently focused selector
+ *
+ * Scans animation items in the currently focused selector for parameters
+ * that end with "~ptkl" suffix. If no selector is focused, returns an empty result.
+ *
+ * @param edit Edit instance
+ * @param targets [out] Output targets (caller must free with ptk_anm2_edit_ptkl_targets_free)
+ * @param err [out] Error information on failure
+ * @return true on success, false on failure
+ */
+NODISCARD bool ptk_anm2_edit_collect_ptkl_targets(struct ptk_anm2_edit *edit,
+                                                  struct ptk_anm2_edit_ptkl_targets *targets,
+                                                  struct ov_error *err);
+
+/**
+ * @brief Set a parameter value by ID
+ *
+ * @param edit Edit instance
+ * @param param_id Parameter ID
+ * @param value New value to set (UTF-8)
+ * @param err [out] Error information on failure
+ * @return true on success, false on failure
+ */
+NODISCARD bool ptk_anm2_edit_set_param_value_by_id(struct ptk_anm2_edit *edit,
+                                                   uint32_t param_id,
+                                                   char const *value,
+                                                   struct ov_error *err);
