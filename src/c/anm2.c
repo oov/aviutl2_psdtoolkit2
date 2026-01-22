@@ -371,6 +371,48 @@ static bool escape_lua_string(char **const dest, char const *const src, struct o
   return true;
 }
 
+// Sanitize display name for --select@ format
+// Replaces '=' with '＝' (U+FF1D) and ',' with '，' (U+FF0C)
+// to avoid breaking the selector syntax.
+// The dest buffer is reused; caller must destroy it after all calls.
+// OV_ARRAY_LENGTH returns the string length (not including NUL terminator).
+static bool sanitize_selector_name(char **const dest, char const *const src, struct ov_error *const err) {
+  OV_ARRAY_SET_LENGTH(*dest, 0);
+  if (!src || src[0] == '\0') {
+    return true;
+  }
+
+  size_t const src_len = strlen(src);
+  size_t j = 0;
+  for (size_t i = 0; i < src_len; i++) {
+    unsigned char const c = (unsigned char)src[i];
+    size_t const need = (c == '=' || c == ',') ? 3 : 1;
+    if (j + need + 1 > OV_ARRAY_CAPACITY(*dest)) {
+      size_t const new_cap = (OV_ARRAY_CAPACITY(*dest) + need + 1) * 2;
+      if (!OV_ARRAY_GROW(dest, new_cap)) {
+        OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+        return false;
+      }
+    }
+    if (c == '=') {
+      // '=' -> '＝' (U+FF1D: 0xEF 0xBC 0x9D)
+      (*dest)[j++] = (char)0xEF;
+      (*dest)[j++] = (char)0xBC;
+      (*dest)[j++] = (char)0x9D;
+    } else if (c == ',') {
+      // ',' -> '，' (U+FF0C: 0xEF 0xBC 0x8C)
+      (*dest)[j++] = (char)0xEF;
+      (*dest)[j++] = (char)0xBC;
+      (*dest)[j++] = (char)0x8C;
+    } else {
+      (*dest)[j++] = (char)c;
+    }
+  }
+  (*dest)[j] = '\0';
+  OV_ARRAY_SET_LENGTH(*dest, j);
+  return true;
+}
+
 // Helper function for generating a single param line
 // escaped is reused buffer, caller must destroy it after all calls
 static bool generate_param_line(char **const content,
@@ -576,6 +618,7 @@ cleanup:
 static bool
 generate_script_content(struct ptk_anm2 const *const doc, char **const content, struct ov_error *const err) {
   char *escaped = NULL;
+  char *sanitized = NULL;
   char *body = NULL;
   bool success = false;
 
@@ -667,7 +710,11 @@ generate_script_content(struct ptk_anm2 const *const doc, char **const content, 
           display_name = item->script_name;
         }
         if (display_name && display_name[0] != '\0') {
-          if (!ov_sprintf_append_char(&body, err, "%1$s%2$zu", ",%1$s=%2$zu", display_name, j + 1)) {
+          if (!sanitize_selector_name(&sanitized, display_name, err)) {
+            OV_ERROR_ADD_TRACE(err);
+            goto cleanup;
+          }
+          if (!ov_sprintf_append_char(&body, err, "%1$s%2$zu", ",%1$s=%2$zu", sanitized, j + 1)) {
             OV_ERROR_ADD_TRACE(err);
             goto cleanup;
           }
@@ -793,6 +840,9 @@ cleanup:
   if (escaped) {
     OV_ARRAY_DESTROY(&escaped);
   }
+  if (sanitized) {
+    OV_ARRAY_DESTROY(&sanitized);
+  }
   if (body) {
     OV_ARRAY_DESTROY(&body);
   }
@@ -806,6 +856,7 @@ cleanup:
 
 static bool
 generate_parts_override_script(struct ptk_anm2 const *const doc, char **const content, struct ov_error *const err) {
+  char *sanitized = NULL;
   bool success = false;
 
   // Note: Header (@OverwriteSelector) is added by caller (generate_obj2_content)
@@ -861,7 +912,11 @@ generate_parts_override_script(struct ptk_anm2 const *const doc, char **const co
           display_name = item->script_name;
         }
         if (display_name && display_name[0] != '\0') {
-          if (!ov_sprintf_append_char(content, err, "%1$s%2$zu", ",%1$s=%2$zu", display_name, j + 1)) {
+          if (!sanitize_selector_name(&sanitized, display_name, err)) {
+            OV_ERROR_ADD_TRACE(err);
+            goto cleanup;
+          }
+          if (!ov_sprintf_append_char(content, err, "%1$s%2$zu", ",%1$s=%2$zu", sanitized, j + 1)) {
             OV_ERROR_ADD_TRACE(err);
             goto cleanup;
           }
@@ -911,6 +966,9 @@ generate_parts_override_script(struct ptk_anm2 const *const doc, char **const co
   success = true;
 
 cleanup:
+  if (sanitized) {
+    OV_ARRAY_DESTROY(&sanitized);
+  }
   return success;
 }
 
