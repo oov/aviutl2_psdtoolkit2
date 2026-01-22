@@ -442,6 +442,7 @@ func (ed *Editing) updateTagState(filePath string, tag int, state string) (bool,
 	if existingIndex >= 0 {
 		// Update existing item's latest state
 		ed.images[existingIndex].LatestState = state
+		needRefresh = true
 	} else {
 		// Load new image
 		if len(ed.images) >= limit {
