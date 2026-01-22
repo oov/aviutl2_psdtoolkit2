@@ -11,7 +11,6 @@ import (
 	"github.com/oov/psd/composite"
 	"github.com/pkg/errors"
 
-	"psdtoolkit/ods"
 	"psdtoolkit/warn"
 )
 
@@ -155,20 +154,17 @@ func (img *Image) RenderWithScale(ctx context.Context, scale float64, quality Sc
 	var err error
 	tileSize := img.PSD.Renderer.TileSize()
 
-	t0 := time.Now()
 	if img.image == nil {
 		img.image = image.NewNRGBA(img.PSD.CanvasRect)
 		err = img.PSD.Renderer.Render(ctx, img.image)
 		// Clear scaled cache on initial render
 		img.scaledImages = nil
 		img.pendingDirtyTiles = nil
-		ods.ODS("  RenderWithScale: full render took %dms", time.Since(t0).Milliseconds())
 	} else {
 		dirtyTiles, err2 := img.PSD.Renderer.RenderDiffWithDirtyTiles(ctx, img.image)
 		if err2 != nil {
 			return nil, errors.Wrap(err2, "img: render failed")
 		}
-		ods.ODS("  RenderWithScale: diff render took %dms, %d dirty tiles", time.Since(t0).Milliseconds(), len(dirtyTiles))
 		// Accumulate dirty tiles for each quality
 		if len(dirtyTiles) > 0 {
 			if img.pendingDirtyTiles == nil {
@@ -215,7 +211,6 @@ func (img *Image) RenderWithScale(ctx context.Context, scale float64, quality Sc
 
 		// Use differential downscale if we have pending dirty tiles and a cached image
 		if hasCached && len(pendingTiles) > 0 {
-			t1 := time.Now()
 			switch quality {
 			case ScaleQualityFast:
 				if err = downscale.NRGBAFastPartial(ctx, cached, img.image, tileSize, tileSize, pendingTiles); err != nil {
@@ -226,17 +221,14 @@ func (img *Image) RenderWithScale(ctx context.Context, scale float64, quality Sc
 					return nil, errors.Wrap(err, "img: partial downscale failed")
 				}
 			}
-			ods.ODS("  partial downscale (%s): %dms (%d tiles)", quality, time.Since(t1).Milliseconds(), len(pendingTiles))
 			// Clear pending dirty tiles for this quality
 			img.pendingDirtyTiles[quality] = nil
 			nrgba = cached
 		} else if hasCached && len(pendingTiles) == 0 {
 			// No changes, use cached
-			ods.ODS("  downscale: cached")
 			nrgba = cached
 		} else {
 			// Full downscale (initial or cache miss)
-			t1 := time.Now()
 			tmp := image.NewNRGBA(r)
 			switch quality {
 			case ScaleQualityFast:
@@ -248,7 +240,6 @@ func (img *Image) RenderWithScale(ctx context.Context, scale float64, quality Sc
 					return nil, errors.Wrap(err, "img: downscale failed")
 				}
 			}
-			ods.ODS("  full downscale (%s): %dms", quality, time.Since(t1).Milliseconds())
 			img.scaledImages[quality] = tmp
 			// Clear pending dirty tiles since we did full downscale
 			if img.pendingDirtyTiles != nil {

@@ -85,7 +85,6 @@ func (lv *LayerView) UpdateLayerThumbnails(tree *composite.Tree, size int, doMai
 	lv.thumbnailChip = map[int]*nk.Image{}
 	lv.thumbnailSize = size
 	jq.Enqueue(func(ctx context.Context) error {
-		s := time.Now().UnixNano()
 		nrgba, ptMap, err := tree.ThumbnailSheet(ctx, size)
 		if err != nil {
 			doMain(func() error {
@@ -94,7 +93,6 @@ func (lv *LayerView) UpdateLayerThumbnails(tree *composite.Tree, size int, doMai
 			})
 			return nil
 		}
-		ods.ODS("thumbnail: %dms", (time.Now().UnixNano()-s)/1e6)
 		if err = doMain(func() error {
 			lv.thumbnail.Update(nrgba)
 			lv.thumbnailChip = map[int]*nk.Image{}

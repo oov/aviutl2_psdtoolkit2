@@ -3,7 +3,6 @@ package mainview
 import (
 	"context"
 	"math"
-	"time"
 
 	"psdtoolkit/img"
 	"psdtoolkit/ods"
@@ -34,13 +33,11 @@ func (mv *MainView) updateViewImage(mode viewResizeMode) {
 
 		// Render with fast quality first
 		if mode == vrmFast || mode == vrmFastAfterBeautiful {
-			s := time.Now().UnixNano()
 			resizedImage, err := mv.renderScaled(ctx, mv.currentImg, scale, img.ScaleQualityFast)
 			if err != nil || resizedImage == nil {
 				ods.ODS("renderScaled(fast): aborted or nil")
 				return nil
 			}
-			ods.ODS("renderScaled(fast): %dms", (time.Now().UnixNano()-s)/1e6)
 			mv.do(func() {
 				mv.renderedImage = resizedImage
 				mv.resizedImage = resizedImage
@@ -57,13 +54,11 @@ func (mv *MainView) updateViewImage(mode viewResizeMode) {
 		}
 
 		// Render with beautiful quality
-		s := time.Now().UnixNano()
 		resizedImage, err := mv.renderScaled(ctx, mv.currentImg, scale, img.ScaleQualityBeautiful)
 		if err != nil || resizedImage == nil {
 			ods.ODS("renderScaled(beautiful): aborted or nil")
 			return nil
 		}
-		ods.ODS("renderScaled(beautiful): %dms", (time.Now().UnixNano()-s)/1e6)
 		mv.do(func() {
 			mv.renderedImage = resizedImage
 			mv.resizedImage = resizedImage
