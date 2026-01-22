@@ -618,6 +618,11 @@ bool ipc_draw(struct ipc *const self,
   uint32_t reply = 0;
   int32_t len = 0;
   bool result = false;
+
+  LARGE_INTEGER freq, t0, t1, t2, t3;
+  QueryPerformanceFrequency(&freq);
+  QueryPerformanceCounter(&t0);
+
   mtx_lock(&self->mtx_stdin);
   if (!write_uint32(self->h_stdin, cmd, err) || !write_int32(self->h_stdin, id, err) ||
       !write_string(self->h_stdin, path_utf8, err) || !write_int32(self->h_stdin, width, err) ||
@@ -627,11 +632,13 @@ bool ipc_draw(struct ipc *const self,
     goto cleanup;
   }
   mtx_unlock(&self->mtx_stdin);
+  QueryPerformanceCounter(&t1);
 
   if (!wait_for_reply(self, &reply, err)) {
     OV_ERROR_ADD_TRACE(err);
     goto cleanup;
   }
+  QueryPerformanceCounter(&t2);
 
   if (!read_int32(self->h_stdout, &len, err)) {
     OV_ERROR_ADD_TRACE(err);
@@ -647,6 +654,18 @@ bool ipc_draw(struct ipc *const self,
       goto cleanup;
     }
   }
+  QueryPerformanceCounter(&t3);
+
+  ptk_logf_info(NULL,
+                NULL,
+                "[ipc_draw] size=%dx%d send=%.2fms wait=%.2fms read=%.2fms (len=%d)",
+                width,
+                height,
+                (double)(t1.QuadPart - t0.QuadPart) * 1000.0 / (double)freq.QuadPart,
+                (double)(t2.QuadPart - t1.QuadPart) * 1000.0 / (double)freq.QuadPart,
+                (double)(t3.QuadPart - t2.QuadPart) * 1000.0 / (double)freq.QuadPart,
+                len);
+
   result = true;
 cleanup:
   ipc_reply_consumed(self);
@@ -760,6 +779,13 @@ bool ipc_set_props(struct ipc *const self,
   }
   if (params->tag) {
     if (!write_int32(self->h_stdin, 5, err) || !write_uint32(self->h_stdin, *params->tag, err)) {
+      mtx_unlock(&self->mtx_stdin);
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+  }
+  if (params->quality) {
+    if (!write_int32(self->h_stdin, 6, err) || !write_int32(self->h_stdin, *params->quality, err)) {
       mtx_unlock(&self->mtx_stdin);
       OV_ERROR_ADD_TRACE(err);
       goto cleanup;

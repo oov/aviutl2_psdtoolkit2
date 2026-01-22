@@ -115,6 +115,38 @@ cleanup:
   }
 }
 
+void ptk_script_module_get_draft_mode(struct ptk_script_module *const sm,
+                                      struct aviutl2_script_module_param *const param) {
+  struct ov_error err = {0};
+  bool draft_mode = false;
+  bool success = false;
+
+  if (!sm || !param) {
+    OV_ERROR_SET_GENERIC(&err, ov_error_generic_invalid_argument);
+    goto cleanup;
+  }
+
+  if (!sm->callbacks.get_draft_mode) {
+    OV_ERROR_SET_GENERIC(&err, ov_error_generic_not_implemented_yet);
+    goto cleanup;
+  }
+
+  if (!sm->callbacks.get_draft_mode(sm->callbacks.userdata, &draft_mode, &err)) {
+    OV_ERROR_ADD_TRACE(&err);
+    goto cleanup;
+  }
+
+  param->push_result_boolean(draft_mode);
+  success = true;
+
+cleanup:
+  if (!success) {
+    param->push_result_boolean(false);
+    ptk_logf_error(&err, "%1$hs", "%1$hs", gettext("failed to get draft mode."));
+    OV_ERROR_DESTROY(&err);
+  }
+}
+
 void ptk_script_module_generate_tag(struct ptk_script_module *const sm,
                                     struct aviutl2_script_module_param *const param) {
   if (!sm || !param) {
@@ -187,6 +219,7 @@ void ptk_script_module_set_props(struct ptk_script_module *const sm, struct aviu
         .offset_x = param->get_param_table_int(2, "offsetx"),
         .offset_y = param->get_param_table_int(2, "offsety"),
         .tag = param->get_param_table_int(2, "tag"),
+        .quality = param->get_param_table_int(2, "quality"), // 0=Fast, 1=Beautiful
     };
 
     struct ptk_script_module_set_props_result result = {0};

@@ -93,6 +93,7 @@ struct ipc_prop_params {
   int32_t const *offset_x;
   int32_t const *offset_y;
   uint32_t const *tag;
+  int32_t const *quality; // 0=Fast, 1=Beautiful (matches Go ScaleQuality)
 };
 
 struct ipc_prop_result {

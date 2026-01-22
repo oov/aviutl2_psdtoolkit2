@@ -57,6 +57,19 @@ static bool sm_get_debug_mode(void *const userdata, bool *const debug_mode, stru
   return true;
 }
 
+static bool sm_get_draft_mode(void *const userdata, bool *const draft_mode, struct ov_error *const err) {
+  struct psdtoolkit *const ptk = (struct psdtoolkit *)userdata;
+  if (!ptk || !ptk->config) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_unexpected);
+    return false;
+  }
+  if (!ptk_config_get_draft_mode(ptk->config, draft_mode, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    return false;
+  }
+  return true;
+}
+
 static bool
 sm_add_file(void *const userdata, char const *const path_utf8, uint32_t const tag, struct ov_error *const err) {
   struct psdtoolkit *const ptk = (struct psdtoolkit *)userdata;
@@ -86,6 +99,7 @@ static bool sm_set_props(void *const userdata,
   int32_t offset_x_val = params->offset_x;
   int32_t offset_y_val = params->offset_y;
   uint32_t tag_val = (uint32_t)params->tag;
+  int32_t quality_val = params->quality;
 
   struct ipc_prop_params ipc_params = {
       .layer = params->layer,
@@ -93,6 +107,7 @@ static bool sm_set_props(void *const userdata,
       .offset_x = &offset_x_val,
       .offset_y = &offset_y_val,
       .tag = &tag_val,
+      .quality = &quality_val,
   };
 
   struct ipc_prop_result ipc_result = {0};
@@ -1198,6 +1213,7 @@ NODISCARD struct psdtoolkit *psdtoolkit_create(struct ptk_cache *const cache, st
         &(struct ptk_script_module_callbacks){
             .userdata = ptk,
             .get_debug_mode = sm_get_debug_mode,
+            .get_draft_mode = sm_get_draft_mode,
             .add_file = sm_add_file,
             .set_props = sm_set_props,
             .get_drop_config = sm_get_drop_config,

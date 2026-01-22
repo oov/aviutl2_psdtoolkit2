@@ -126,11 +126,13 @@ func (ipc *IPC) draw(id int, filePath string, width, height int) ([]byte, error)
 	}
 
 	startAt := time.Now().UnixNano()
-	nrgba, err := img.Render(context.Background())
+	// Use RenderWithScale for differential rendering support
+	nrgba, err := img.RenderWithScale(context.Background(), float64(img.Scale), img.ScaleQuality)
 	if err != nil {
 		return nil, errors.Wrap(err, "ipc: could not render")
 	}
 	ret := image.NewNRGBA(image.Rect(0, 0, width, height))
+	// Apply offset: scaled image is placed at offset position in output buffer
 	blend.Copy.Draw(ret, ret.Rect, nrgba, image.Pt(int(float32(-img.OffsetX)*img.Scale), int(float32(-img.OffsetY)*img.Scale)))
 	nrgbaToNBGRA(ret.Pix)
 	ipc.cache[ckey] = cacheValue{
@@ -355,6 +357,7 @@ func (ipc *IPC) dispatch(cmd string) error {
 		return writeUint32(0x80000000)
 
 	case "DRAW":
+		t0 := time.Now()
 		id, filePath, err := readIDAndFilePath()
 		if err != nil {
 			return err
@@ -368,14 +371,25 @@ func (ipc *IPC) dispatch(cmd string) error {
 			return err
 		}
 		ods.ODS("  Width: %d / Height: %d", width, height)
+		t1 := time.Now()
 		b, err := ipc.draw(id, filePath, width, height)
 		if err != nil {
 			return err
 		}
+		t2 := time.Now()
 		if err = writeUint32(0x80000000); err != nil {
 			return err
 		}
-		return writeBinary(b)
+		if err = writeBinary(b); err != nil {
+			return err
+		}
+		t3 := time.Now()
+		ods.ODS("  [DRAW timing] parse=%.2fms draw=%.2fms write=%.2fms (len=%d)",
+			float64(t1.Sub(t0).Microseconds())/1000.0,
+			float64(t2.Sub(t1).Microseconds())/1000.0,
+			float64(t3.Sub(t2).Microseconds())/1000.0,
+			len(b))
+		return nil
 
 	case "LNAM":
 		id, filePath, err := readIDAndFilePath()

@@ -18,6 +18,7 @@ struct ptk_script_module_set_props_params {
   int offset_x;
   int offset_y;
   int tag;
+  int quality; // 0=Fast, 1=Beautiful
 };
 
 /**
@@ -59,6 +60,15 @@ struct ptk_script_module_callbacks {
    * @return true on success, false on failure
    */
   bool (*get_debug_mode)(void *userdata, bool *debug_mode, struct ov_error *err);
+
+  /**
+   * @brief Get the current draft mode setting
+   * @param userdata Context pointer
+   * @param draft_mode [out] Receives true if draft mode is enabled
+   * @param err [out] Error information on failure
+   * @return true on success, false on failure
+   */
+  bool (*get_draft_mode)(void *userdata, bool *draft_mode, struct ov_error *err);
 
   /**
    * @brief Add a PSD file to the manager
@@ -146,6 +156,16 @@ void ptk_script_module_destroy(struct ptk_script_module **sm);
 void ptk_script_module_get_debug_mode(struct ptk_script_module *sm,
                                       struct aviutl2_script_module_param *param,
                                       int cache_index);
+
+/**
+ * @brief Script function: Get draft mode setting
+ *
+ * Pushes a boolean result indicating whether draft mode (fast quality) is enabled.
+ *
+ * @param sm Script module instance
+ * @param param Script module parameter interface
+ */
+void ptk_script_module_get_draft_mode(struct ptk_script_module *sm, struct aviutl2_script_module_param *param);
 
 /**
  * @brief Script function: Generate a unique tag value

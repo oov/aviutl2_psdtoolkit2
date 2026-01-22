@@ -31,8 +31,11 @@ enum {
   id_group_psd_drop = 140,
   id_check_manual_shift_psd = 141,
 
-  id_group_debug = 150,
-  id_check_debug_mode = 151,
+  id_group_rendering = 150,
+  id_check_draft_mode = 151,
+
+  id_group_debug = 160,
+  id_check_debug_mode = 161,
 };
 
 static NATIVE_CHAR const g_config_dialog_prop_name[] = L"PTKConfigDialogData";
@@ -306,6 +309,14 @@ static INT_PTR init_dialog(HWND dialog, struct dialog_data *data) {
       pgettext("config", "Only create PSD file object when dropping *.&psd/*.psb file while holding Shift key"));
   SetWindowTextW(GetDlgItem(dialog, id_check_manual_shift_psd), buf);
 
+  // Rendering group
+  ov_snprintf_wchar(buf, sizeof(buf) / sizeof(WCHAR), ph, ph, pgettext("config", "Rendering"));
+  SetWindowTextW(GetDlgItem(dialog, id_group_rendering), buf);
+
+  ov_snprintf_wchar(
+      buf, sizeof(buf) / sizeof(WCHAR), ph, ph, pgettext("config", "Use &fast (draft) quality for PSD downscaling"));
+  SetWindowTextW(GetDlgItem(dialog, id_check_draft_mode), buf);
+
   // Debug group
   ov_snprintf_wchar(buf, sizeof(buf) / sizeof(WCHAR), ph, ph, pgettext("config", "Debug"));
   SetWindowTextW(GetDlgItem(dialog, id_group_debug), buf);
@@ -357,6 +368,13 @@ static INT_PTR init_dialog(HWND dialog, struct dialog_data *data) {
     value = false;
     if (ptk_config_get_manual_shift_psd(data->config, &value, &err)) {
       SendMessageW(GetDlgItem(dialog, id_check_manual_shift_psd), BM_SETCHECK, value ? BST_CHECKED : BST_UNCHECKED, 0);
+    } else {
+      OV_ERROR_REPORT(&err, NULL);
+    }
+
+    value = false;
+    if (ptk_config_get_draft_mode(data->config, &value, &err)) {
+      SendMessageW(GetDlgItem(dialog, id_check_draft_mode), BM_SETCHECK, value ? BST_CHECKED : BST_UNCHECKED, 0);
     } else {
       OV_ERROR_REPORT(&err, NULL);
     }
@@ -428,6 +446,15 @@ static bool click_ok(HWND dialog, struct dialog_data *data) {
     // Save manual_shift_psd
     LRESULT const checked = SendMessageW(GetDlgItem(dialog, id_check_manual_shift_psd), BM_GETCHECK, 0, 0);
     if (!ptk_config_set_manual_shift_psd(data->config, checked == BST_CHECKED, &err)) {
+      OV_ERROR_ADD_TRACE(&err);
+      goto cleanup;
+    }
+  }
+
+  {
+    // Save draft_mode
+    LRESULT const checked = SendMessageW(GetDlgItem(dialog, id_check_draft_mode), BM_GETCHECK, 0, 0);
+    if (!ptk_config_set_draft_mode(data->config, checked == BST_CHECKED, &err)) {
       OV_ERROR_ADD_TRACE(&err);
       goto cleanup;
     }

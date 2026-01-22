@@ -135,6 +135,10 @@ function PSD:draw(obj)
 	-- Build layer state string
 	local layer_str = self:buildlayer(obj)
 
+	-- Convert draft_mode (bool) to quality (int: 0=Fast, 1=Beautiful)
+	local draft_mode = ptk.get_draft_mode()
+	local quality = draft_mode and 0 or 1
+
 	-- Call set_props to get cache key and dimensions
 	-- modified: indicates whether properties (layer, scale, offset) changed since last call.
 	--           This does NOT indicate cache existence. Even if modified=false, cache may not exist
@@ -145,6 +149,7 @@ function PSD:draw(obj)
 		scale = self.scale,
 		offsetx = self.offsetx,
 		offsety = self.offsety,
+		quality = quality,
 	})
 	dbg(
 		"PSD:draw: id=%s modified=%s cachekey=%s size=%sx%s",

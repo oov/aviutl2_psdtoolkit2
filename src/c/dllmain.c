@@ -403,6 +403,13 @@ static void script_module_get_debug_mode(struct aviutl2_script_module_param *par
   }
   ptk_script_module_get_debug_mode(g_script_module, param, g_cache_index);
 }
+static void script_module_get_draft_mode(struct aviutl2_script_module_param *param) {
+  if (!g_script_module) {
+    param->push_result_boolean(false);
+    return;
+  }
+  ptk_script_module_get_draft_mode(g_script_module, param);
+}
 static void script_module_generate_tag(struct aviutl2_script_module_param *param) {
   ptk_script_module_generate_tag(g_script_module, param);
 }
@@ -563,6 +570,7 @@ void __declspec(dllexport) RegisterPlugin(struct aviutl2_host_app_table *host) {
 
   static struct aviutl2_script_module_function script_module_functions[] = {
       {L"get_debug_mode", script_module_get_debug_mode},
+      {L"get_draft_mode", script_module_get_draft_mode},
       {L"get_drop_config", script_module_get_drop_config},
       {L"get_preferred_languages", script_module_get_preferred_languages},
       {L"generate_tag", script_module_generate_tag},
