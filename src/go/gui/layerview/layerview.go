@@ -236,7 +236,10 @@ func (lv *LayerView) layerTreeItem(ctx *nk.Context, indent, thumbSize float32, t
 	indent += collapseSize + gap
 
 	layerName := strings.ReplaceAll(l.Name, "\x00", "")
-	w := nkhelper.TextWidth(lv.mainFontHandle, layerName) + marginSize*2 + visibleSize + thumbSize + thumbTextSpacing
+	w := nkhelper.TextWidth(lv.mainFontHandle, layerName) + marginSize*2 + visibleSize
+	if !l.Folder {
+		w += thumbSize + thumbTextSpacing
+	}
 	if l.Clipping {
 		w += visibleSize
 	}
@@ -291,6 +294,9 @@ func (lv *LayerView) layerTreeItem(ctx *nk.Context, indent, thumbSize float32, t
 		var white nk.Color
 		white.SetRGBA(255, 255, 255, 255)
 		nk.NkDrawImage(canvas, nk.NkRect(rect.X(), rect.Y()+rect.H()/2-thumbSize/2, thumbSize, thumbSize), thumb, white)
+	}
+	// Reserve space for thumbnail for non-folder layers to keep text alignment consistent
+	if !l.Folder {
 		rect = nk.NkRect(rect.X()+thumbSize+thumbTextSpacing, rect.Y(), rect.W()-thumbSize-thumbTextSpacing, rect.H())
 	}
 
