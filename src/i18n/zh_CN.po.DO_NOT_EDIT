@@ -124,6 +124,10 @@ msgid "AviUtl1 Animation Script"
 msgstr "AviUtl1 动画脚本"
 
 msgctxt "config"
+msgid "Beautiful"
+msgstr ""
+
+msgctxt "config"
 msgid "Cancel"
 msgstr "取消"
 
@@ -134,6 +138,10 @@ msgstr "取消"
 msgctxt "gui"
 msgid "Capture"
 msgstr "接收"
+
+msgctxt ".ptk.anm2 OverwriteSelector"
+msgid "Character ID"
+msgstr "角色ID"
 
 msgctxt "anm2editor"
 msgid "Conversion completed."
@@ -172,6 +180,10 @@ msgstr ""
 msgctxt "config"
 msgid "Debug"
 msgstr "调试"
+
+msgctxt "anm2editor"
+msgid "Default Character ID"
+msgstr "角色ID默认值"
 
 msgctxt "anm2editor"
 msgid "Delete"
@@ -225,6 +237,10 @@ msgstr "设置保存失败。"
 
 msgid "Failed to update editing image state."
 msgstr "编辑图像状态更新失败。"
+
+msgctxt "config"
+msgid "Fast"
+msgstr ""
 
 msgctxt "layerview"
 msgid "Favorites"
@@ -299,12 +315,17 @@ msgstr "打开"
 msgid "Operation failed."
 msgstr "操作失败。"
 
+msgctxt ".ptk.anm2 multi-script section name"
+msgid "OverwriteSelector"
+msgstr "部件替换"
+
 msgctxt ".ptk.anm2 label"
 msgid "PSD"
 msgstr "PSD"
 
+#, fuzzy
 msgctxt "config"
-msgid "PSD File Drop"
+msgid "PSD File"
 msgstr "PSD文件路径"
 
 msgctxt "anm2editor"
@@ -312,6 +333,11 @@ msgid "PSD File Path"
 msgstr "PSD文件路径"
 
 msgctxt ".ptk.anm2"
+msgid "PSD Layer Selector for %1$hs"
+msgstr "%1$hs 用PSD图层选择器"
+
+#, fuzzy
+msgctxt ".ptk.anm2 OverwriteSelector"
 msgid "PSD Layer Selector for %1$hs"
 msgstr "%1$hs 用PSD图层选择器"
 
@@ -368,6 +394,10 @@ msgctxt "anm2editor"
 msgid "Rename"
 msgstr "重命名"
 
+msgctxt "config"
+msgid "Resize Quality:"
+msgstr ""
+
 msgctxt "anm2editor"
 msgid "Reverse Items"
 msgstr "反转项目排序"
@@ -399,6 +429,10 @@ msgstr "选择要导入的脚本:"
 msgctxt ".ptk.anm2 default name for unnamed selector"
 msgid "Selector"
 msgstr "选择器"
+
+msgctxt ".ptk.anm2 multi-script section name"
+msgid "Selector"
+msgstr "部件切换"
 
 msgctxt "gui"
 msgid "Send"
@@ -527,11 +561,11 @@ msgstr "编辑区不可用。"
 msgid "failed to add PSD file."
 msgstr "PSD文件添加失败。"
 
+msgid "failed to create window."
+msgstr "文本文件读取失败。"
+
 msgid "failed to draw PSD image."
 msgstr "PSD图像渲染失败。"
-
-msgid "failed to end transaction in error recovery."
-msgstr "无法在错误恢复期间中终止事务。"
 
 msgid "failed to get %1$hs on %2$hs."
 msgstr "%2$hs 上的 %1$hs 获取失败。"
@@ -539,14 +573,15 @@ msgstr "%2$hs 上的 %1$hs 获取失败。"
 msgid "failed to get alias data from the selected object."
 msgstr "无法从选中物件中获取预存数据。"
 
-msgid "failed to get debug mode."
-msgstr "调试模式设置获取失败。"
-
 msgid "failed to get drop configuration."
 msgstr "拖放配置获取失败。"
 
 msgid "failed to get preferred languages."
 msgstr "首选语言设置获取失败。"
+
+#, fuzzy
+msgid "failed to get render config."
+msgstr "拖放配置获取失败。"
 
 msgid "failed to get required functions from GCMZDrops.aux2 plug-in."
 msgstr "GCMZDrops.aux2 插件必要函数获取失败。"
@@ -600,3 +635,6 @@ msgstr "AviUtl 中未选中任何物件。"
 #. trans: This dagger helps UTF-8 detection. You don't need to translate this.
 msgid "†"
 msgstr ""
+
+#~ msgid "failed to get debug mode."
+#~ msgstr "调试模式设置获取失败。"
