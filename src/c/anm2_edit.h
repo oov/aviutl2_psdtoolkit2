@@ -4,6 +4,7 @@
 #include <ovbase.h>
 
 struct ptk_anm2_edit;
+struct ptk_anm2_script_mapper;
 
 enum ptk_anm2_edit_focus_type {
   ptk_anm2_edit_focus_none,
@@ -31,7 +32,14 @@ enum ptk_anm2_edit_view_op {
   ptk_anm2_edit_view_treeview_move_item,       // id=item_id, parent_id=new_selector_id, index=new_position
   ptk_anm2_edit_view_treeview_select,          // id=item_id/selector_id, is_selector, selected
   ptk_anm2_edit_view_treeview_set_focus,       // id=item_id/selector_id, is_selector
-  ptk_anm2_edit_view_detail_refresh,           // Detail panel should refresh
+  // Detail panel events (for differential updates)
+  ptk_anm2_edit_view_detail_refresh,         // Full refresh required (selection mode changed, etc.)
+  ptk_anm2_edit_view_detail_insert_param,    // id=param_id, parent_id=item_id
+  ptk_anm2_edit_view_detail_remove_param,    // id=param_id, parent_id=item_id
+  ptk_anm2_edit_view_detail_update_param,    // id=param_id, parent_id=item_id (key or value changed)
+  ptk_anm2_edit_view_detail_update_item,     // id=item_id (name or value changed)
+  ptk_anm2_edit_view_detail_item_selected,   // id=item_id (multisel: item added)
+  ptk_anm2_edit_view_detail_item_deselected, // id=item_id (multisel: item removed)
   // State notification events (notifies what changed, not what to do)
   ptk_anm2_edit_view_undo_redo_state_changed, // can_undo or can_redo changed
   ptk_anm2_edit_view_modified_state_changed,  // modified flag changed
@@ -59,6 +67,9 @@ void ptk_anm2_edit_destroy(struct ptk_anm2_edit **edit);
 
 // Get the underlying document (read-only)
 struct ptk_anm2 const *ptk_anm2_edit_get_doc(struct ptk_anm2_edit const *edit);
+
+// Get the script mapper for translating script names to effect names
+struct ptk_anm2_script_mapper const *ptk_anm2_edit_get_script_mapper(struct ptk_anm2_edit const *edit);
 
 // Set view callback to receive differential updates
 void ptk_anm2_edit_set_view_callback(struct ptk_anm2_edit *edit, ptk_anm2_edit_view_callback callback, void *userdata);
@@ -220,7 +231,8 @@ bool ptk_anm2_edit_verify_checksum(struct ptk_anm2_edit const *edit);
  */
 struct ptk_anm2_edit_ptkl_target {
   char *selector_name; // Selector group name, e.g., "目パチ" (ovarray)
-  char *effect_name;   // Effect/item display name, e.g., "目パチ@PSDToolKit" (ovarray)
+  char *display_name;  // Display name for UI, e.g., "目パチ@PSDToolKit" (ovarray, user-editable)
+  char *effect_name;   // Effect name from INI for i18n lookup, e.g., "目パチ@PSDToolKit" (ovarray, can be NULL)
   char *param_key;     // Parameter key, e.g., "開き~ptkl" (ovarray)
   uint32_t selector_id;
   uint32_t item_id;

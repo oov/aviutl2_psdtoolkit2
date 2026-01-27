@@ -302,6 +302,12 @@ static void on_edit_view_change(void *userdata, struct ptk_anm2_edit_view_event 
     break;
 
   case ptk_anm2_edit_view_detail_refresh:
+  case ptk_anm2_edit_view_detail_insert_param:
+  case ptk_anm2_edit_view_detail_remove_param:
+  case ptk_anm2_edit_view_detail_update_param:
+  case ptk_anm2_edit_view_detail_update_item:
+  case ptk_anm2_edit_view_detail_item_selected:
+  case ptk_anm2_edit_view_detail_item_deselected:
   case ptk_anm2_edit_view_before_undo_redo:
     // Handled by detail component
     break;
@@ -529,11 +535,12 @@ static bool add_animation_item(struct ptk_anm2editor *editor,
   // For "before" semantics: if items exist, use first item's ID; otherwise use selector_id (appends to empty)
   uint32_t before_id = selector_id;
   item_ids = ptk_anm2_get_item_ids(ptk_anm2_edit_get_doc(editor->edit_core), selector_id, err);
-  if (item_ids && OV_ARRAY_LENGTH(item_ids) > 0) {
+  if (!item_ids) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+  if (OV_ARRAY_LENGTH(item_ids) > 0) {
     before_id = item_ids[0];
-  } else if (!item_ids) {
-    // Empty selector is not an error, just ignore
-    OV_ERROR_DESTROY(err);
   }
   if (!ptk_anm2_edit_insert_animation_item(editor->edit_core, before_id, script_name, display_name, err)) {
     OV_ERROR_ADD_TRACE(err);
@@ -541,11 +548,13 @@ static bool add_animation_item(struct ptk_anm2editor *editor,
   }
 
   // Get the inserted item's ID (it's now first in the selector)
-  if (item_ids) {
-    OV_ARRAY_DESTROY(&item_ids);
-  }
+  OV_ARRAY_DESTROY(&item_ids);
   item_ids = ptk_anm2_get_item_ids(ptk_anm2_edit_get_doc(editor->edit_core), selector_id, err);
-  if (!item_ids || OV_ARRAY_LENGTH(item_ids) == 0) {
+  if (!item_ids) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+  if (OV_ARRAY_LENGTH(item_ids) == 0) {
     OV_ERROR_SET_GENERIC(err, ov_error_generic_unexpected);
     goto cleanup;
   }
@@ -584,20 +593,46 @@ static bool import_single_script(struct ptk_anm2editor *const editor,
                                  struct ptk_alias_available_script const *const item,
                                  struct ov_error *const err) {
   struct ptk_alias_extracted_animation anim = {0};
+  char *translated_name = NULL;
   bool success = false;
 
   if (!ptk_alias_extract_animation(alias, strlen(alias), item->script_name, item->effect_name, &anim, err)) {
     OV_ERROR_ADD_TRACE(err);
     goto cleanup;
   }
-  if (!add_animation_item(
-          editor, selector_id, anim.script_name, anim.effect_name, anim.params, OV_ARRAY_LENGTH(anim.params), err)) {
+
+  // Use translated name if available, otherwise use effect_name
+  if (item->translated_name) {
+    size_t const src_len = wcslen(item->translated_name);
+    size_t const utf8_len = ov_wchar_to_utf8_len(item->translated_name, src_len);
+    if (utf8_len == 0) {
+      OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+      goto cleanup;
+    }
+    if (!OV_ARRAY_GROW(&translated_name, utf8_len + 1)) {
+      OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+      goto cleanup;
+    }
+    ov_wchar_to_utf8(item->translated_name, src_len, translated_name, utf8_len + 1, NULL);
+    OV_ARRAY_SET_LENGTH(translated_name, utf8_len + 1);
+  }
+
+  if (!add_animation_item(editor,
+                          selector_id,
+                          anim.script_name,
+                          translated_name ? translated_name : anim.effect_name,
+                          anim.params,
+                          OV_ARRAY_LENGTH(anim.params),
+                          err)) {
     OV_ERROR_ADD_TRACE(err);
     goto cleanup;
   }
   success = true;
 
 cleanup:
+  if (translated_name) {
+    OV_ARRAY_DESTROY(&translated_name);
+  }
   ptk_alias_extracted_animation_free(&anim);
   return success;
 }

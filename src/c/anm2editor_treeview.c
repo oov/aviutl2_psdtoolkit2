@@ -302,13 +302,9 @@ static LRESULT handle_customdraw(struct anm2editor_treeview *tv, NMTVCUSTOMDRAW 
   case CDDS_PREPAINT:
     return CDRF_NOTIFYITEMDRAW;
   case CDDS_ITEMPREPAINT: {
-    HTREEITEM hItem = (HTREEITEM)nmcd->nmcd.dwItemSpec;
-    TVITEMW tvi = {.mask = TVIF_PARAM, .hItem = hItem};
-    if (!TreeView_GetItem(tv->window, &tvi)) {
-      return CDRF_DODEFAULT;
-    }
+    // Use lItemlParam directly instead of calling TreeView_GetItem for better performance
     uint32_t id = 0;
-    bool const is_selector = treeview_decode_lparam(tvi.lParam, &id);
+    bool const is_selector = treeview_decode_lparam(nmcd->nmcd.lItemlParam, &id);
 
     // For items: use anm2_selection state
     if (!is_selector && tv->edit) {
@@ -564,6 +560,9 @@ struct anm2editor_treeview *anm2editor_treeview_create(void *parent_window,
 
   // Subclass TreeView for immediate selection on mouse down
   SetWindowSubclass(tv->window, treeview_subclass_proc, TREEVIEW_SUBCLASS_ID, (DWORD_PTR)tv);
+
+  // Enable double buffering to prevent flickering during splitter resize
+  SendMessageW(tv->window, TVM_SETEXTENDEDSTYLE, TVS_EX_DOUBLEBUFFER, TVS_EX_DOUBLEBUFFER);
 
   // Create and set an image list for the TreeView (required for drag image to work)
   {
@@ -1381,6 +1380,12 @@ void anm2editor_treeview_handle_view_event(struct anm2editor_treeview *tv,
     break;
 
   case ptk_anm2_edit_view_detail_refresh:
+  case ptk_anm2_edit_view_detail_insert_param:
+  case ptk_anm2_edit_view_detail_remove_param:
+  case ptk_anm2_edit_view_detail_update_param:
+  case ptk_anm2_edit_view_detail_update_item:
+  case ptk_anm2_edit_view_detail_item_selected:
+  case ptk_anm2_edit_view_detail_item_deselected:
   case ptk_anm2_edit_view_undo_redo_state_changed:
   case ptk_anm2_edit_view_modified_state_changed:
   case ptk_anm2_edit_view_save_state_changed:

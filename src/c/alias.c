@@ -11,6 +11,7 @@
 #include <ovmo.h>
 #include <ovsort.h>
 
+#include "i18n.h"
 #include "ini_reader.h"
 
 /**
@@ -346,6 +347,8 @@ void ptk_alias_available_scripts_free(struct ptk_alias_available_scripts *const 
     if (scripts->items[i].effect_name) {
       OV_FREE(&scripts->items[i].effect_name);
     }
+    // translated_name points to SDK-managed memory, do not free
+    scripts->items[i].translated_name = NULL;
   }
   OV_ARRAY_DESTROY(&scripts->items);
 }
@@ -442,6 +445,7 @@ static bool scan_alias_sections(struct ptk_ini_reader const *const reader,
         }
         scripts->items[len].script_name = script_name;
         scripts->items[len].effect_name = effect_name;
+        scripts->items[len].translated_name = NULL;
         scripts->items[len].selected = true;
         OV_ARRAY_SET_LENGTH(scripts->items, len + 1);
 
@@ -837,4 +841,21 @@ cleanup:
     memset(anim, 0, sizeof(*anim));
   }
   return success;
+}
+
+void ptk_alias_populate_translated_names(struct ptk_alias_available_scripts *const scripts) {
+  if (!scripts || !scripts->items) {
+    return;
+  }
+
+  size_t const n = OV_ARRAY_LENGTH(scripts->items);
+  for (size_t i = 0; i < n; ++i) {
+    struct ptk_alias_available_script *const item = &scripts->items[i];
+    if (!item->effect_name) {
+      continue;
+    }
+
+    // Use effect_name as both section and text
+    item->translated_name = ptk_i18n_get_translated_text(item->effect_name, item->effect_name);
+  }
 }

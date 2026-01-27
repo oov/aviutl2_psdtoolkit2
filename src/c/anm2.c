@@ -1825,7 +1825,8 @@ apply_op(struct ptk_anm2 *doc, struct ptk_anm2_op *op, struct ptk_anm2_op *rever
         OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
         goto cleanup;
       }
-      struct param *p = &doc->selectors[sidx].items[iidx].params[pidx];
+      struct item *item = &doc->selectors[sidx].items[iidx];
+      struct param *p = &item->params[pidx];
       if (!strdup_to_array(&reverse_op->str_data, p->key, err)) {
         OV_ERROR_ADD_TRACE(err);
         goto cleanup;
@@ -1834,7 +1835,10 @@ apply_op(struct ptk_anm2 *doc, struct ptk_anm2_op *op, struct ptk_anm2_op *rever
         OV_ERROR_ADD_TRACE(err);
         goto cleanup;
       }
-      reverse_op->id = p->id;
+      // Set parent_id (item_id) for change callback - same for both forward and reverse
+      op->parent_id = item->id;
+      reverse_op->id = op->id;
+      reverse_op->parent_id = item->id;
     }
     break;
 
@@ -1848,7 +1852,8 @@ apply_op(struct ptk_anm2 *doc, struct ptk_anm2_op *op, struct ptk_anm2_op *rever
         OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
         goto cleanup;
       }
-      struct param *p = &doc->selectors[sidx].items[iidx].params[pidx];
+      struct item *item = &doc->selectors[sidx].items[iidx];
+      struct param *p = &item->params[pidx];
       if (!strdup_to_array(&reverse_op->str_data, p->value, err)) {
         OV_ERROR_ADD_TRACE(err);
         goto cleanup;
@@ -1857,7 +1862,10 @@ apply_op(struct ptk_anm2 *doc, struct ptk_anm2_op *op, struct ptk_anm2_op *rever
         OV_ERROR_ADD_TRACE(err);
         goto cleanup;
       }
-      reverse_op->id = p->id;
+      // Set parent_id (item_id) for change callback - same for both forward and reverse
+      op->parent_id = item->id;
+      reverse_op->id = op->id;
+      reverse_op->parent_id = item->id;
     }
     break;
 
@@ -1935,7 +1943,8 @@ apply_op(struct ptk_anm2 *doc, struct ptk_anm2_op *op, struct ptk_anm2_op *rever
     break;
   case ptk_anm2_op_param_set_key:
   case ptk_anm2_op_param_set_value:
-    notify_change(doc, op->type, op->id, 0, 0);
+    // parent_id is set in apply_op when looking up the param
+    notify_change(doc, op->type, op->id, op->parent_id, 0);
     break;
   case ptk_anm2_op_transaction_begin:
   case ptk_anm2_op_transaction_end:
@@ -4253,17 +4262,15 @@ uint32_t *ptk_anm2_get_item_ids(struct ptk_anm2 const *doc, uint32_t selector_id
   }
 
   struct selector const *sel = &doc->selectors[sel_idx];
-  if (sel->items) {
-    size_t const n = OV_ARRAY_LENGTH(sel->items);
-    if (!OV_ARRAY_GROW(&ids, n)) {
-      OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
-      return NULL;
-    }
-    for (size_t i = 0; i < n; i++) {
-      ids[i] = sel->items[i].id;
-    }
-    OV_ARRAY_SET_LENGTH(ids, n);
+  size_t const n = sel->items ? OV_ARRAY_LENGTH(sel->items) : 0;
+  if (!OV_ARRAY_GROW(&ids, n > 0 ? n : 1)) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+    return NULL;
   }
+  for (size_t i = 0; i < n; i++) {
+    ids[i] = sel->items[i].id;
+  }
+  OV_ARRAY_SET_LENGTH(ids, n);
 
   return ids;
 }
@@ -4284,17 +4291,15 @@ uint32_t *ptk_anm2_get_param_ids(struct ptk_anm2 const *doc, uint32_t item_id, s
   }
 
   struct item const *it = &doc->selectors[sel_idx].items[item_idx];
-  if (it->params) {
-    size_t const n = OV_ARRAY_LENGTH(it->params);
-    if (!OV_ARRAY_GROW(&ids, n)) {
-      OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
-      return NULL;
-    }
-    for (size_t i = 0; i < n; i++) {
-      ids[i] = it->params[i].id;
-    }
-    OV_ARRAY_SET_LENGTH(ids, n);
+  size_t const n = it->params ? OV_ARRAY_LENGTH(it->params) : 0;
+  if (!OV_ARRAY_GROW(&ids, n > 0 ? n : 1)) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+    return NULL;
   }
+  for (size_t i = 0; i < n; i++) {
+    ids[i] = it->params[i].id;
+  }
+  OV_ARRAY_SET_LENGTH(ids, n);
 
   return ids;
 }

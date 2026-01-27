@@ -1,6 +1,8 @@
 #include "anm2editor_detail.h"
 
 #include "anm2_edit.h"
+#include "anm2_script_mapper.h"
+#include "i18n.h"
 #include "logf.h"
 
 #include <ovmo.h>
@@ -152,6 +154,76 @@ static size_t rows_find_by_type(struct anm2editor_detail const *detail, enum anm
     }
   }
   return SIZE_MAX;
+}
+
+/**
+ * @brief Find a row by param_id
+ * @return Row index, or SIZE_MAX if not found
+ */
+static size_t find_row_by_param_id(struct anm2editor_detail const *detail, uint32_t param_id) {
+  size_t const len = OV_ARRAY_LENGTH(detail->rows);
+  for (size_t i = 0; i < len; i++) {
+    if (detail->rows[i].type == anm2editor_detail_row_type_animation_param && detail->rows[i].param_id == param_id) {
+      return i;
+    }
+  }
+  return SIZE_MAX;
+}
+
+/**
+ * @brief Find a row by item_id (for multisel mode)
+ * @return Row index, or SIZE_MAX if not found
+ */
+static size_t find_row_by_item_id(struct anm2editor_detail const *detail, uint32_t item_id) {
+  size_t const len = OV_ARRAY_LENGTH(detail->rows);
+  for (size_t i = 0; i < len; i++) {
+    if (detail->rows[i].type == anm2editor_detail_row_type_multisel_item && detail->rows[i].item_id == item_id) {
+      return i;
+    }
+  }
+  return SIZE_MAX;
+}
+
+/**
+ * @brief Get the insertion position for a multisel item based on treeview order
+ *
+ * When adding an item to multiselection, it should appear in the detail view
+ * at a position that matches the treeview order. This function calculates
+ * that position by counting how many selected items appear before this one
+ * in the treeview order.
+ *
+ * @return Row index where the new multisel_item should be inserted
+ */
+static size_t get_multisel_insert_position(struct anm2editor_detail *detail, uint32_t item_id) {
+  if (!detail || !detail->edit) {
+    return 0;
+  }
+
+  size_t position = 0;
+
+  // Iterate through all items in treeview order
+  size_t const sel_count = ptk_anm2_edit_selector_count(detail->edit);
+  for (size_t sel_idx = 0; sel_idx < sel_count; sel_idx++) {
+    uint32_t const sel_id = ptk_anm2_edit_selector_get_id(detail->edit, sel_idx);
+    size_t const item_count = ptk_anm2_edit_item_count(detail->edit, sel_id);
+
+    for (size_t item_idx = 0; item_idx < item_count; item_idx++) {
+      uint32_t const id = ptk_anm2_edit_item_get_id(detail->edit, sel_idx, item_idx);
+
+      if (id == item_id) {
+        // Found the target item
+        return position;
+      }
+
+      // If this item is selected and is a value item (not animation), count it
+      if (ptk_anm2_edit_is_item_selected(detail->edit, id) && !ptk_anm2_edit_item_is_animation(detail->edit, id)) {
+        position++;
+      }
+    }
+  }
+
+  // Not found - return end position
+  return position;
 }
 
 static void listview_update_row_lparam(HWND listview, int start_row) {
@@ -487,8 +559,9 @@ struct anm2editor_detail *anm2editor_detail_create(void *parent_window,
     goto cleanup;
   }
 
-  // Set extended styles (full row select, grid lines)
-  SendMessageW(detail->listview, LVM_SETEXTENDEDLISTVIEWSTYLE, 0, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
+  // Set extended styles (full row select, grid lines, double buffer to prevent flickering)
+  SendMessageW(
+      detail->listview, LVM_SETEXTENDEDLISTVIEWSTYLE, 0, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER);
 
   // Store pointer to self for subclass callbacks
   SetPropW(detail->listview, L"anm2editor_detail", detail);
@@ -680,27 +753,76 @@ static bool refresh_item(struct anm2editor_detail *detail, uint32_t item_id, str
 
   bool success = false;
   uint32_t *param_ids = NULL;
+  char *translated_key_utf8 = NULL;
+  char *translated_value_utf8 = NULL;
 
   bool const is_animation = ptk_anm2_edit_item_is_animation(detail->edit, item_id);
   if (is_animation) {
-    param_ids = ptk_anm2_get_param_ids(ptk_anm2_edit_get_doc(detail->edit), item_id, err);
-    if (!param_ids) {
-      // Empty params is not an error
-      if (ptk_anm2_edit_param_count(detail->edit, item_id) == 0) {
-        OV_ERROR_DESTROY(err);
-      } else {
-        OV_ERROR_ADD_TRACE(err);
-        goto cleanup;
+    // Get effect_name for translation lookup
+    struct ptk_anm2_script_mapper_result effect_name = {NULL, 0};
+    char const *script_name = ptk_anm2_item_get_script_name(ptk_anm2_edit_get_doc(detail->edit), item_id);
+    if (script_name) {
+      struct ptk_anm2_script_mapper const *mapper = ptk_anm2_edit_get_script_mapper(detail->edit);
+      if (mapper) {
+        effect_name = ptk_anm2_script_mapper_get_effect_name(mapper, script_name);
       }
     }
-    size_t const num_params = param_ids ? OV_ARRAY_LENGTH(param_ids) : 0;
+
+    param_ids = ptk_anm2_get_param_ids(ptk_anm2_edit_get_doc(detail->edit), item_id, err);
+    if (!param_ids) {
+      OV_ERROR_ADD_TRACE(err);
+      goto cleanup;
+    }
+    size_t const num_params = OV_ARRAY_LENGTH(param_ids);
     for (size_t i = 0; i < num_params; i++) {
       uint32_t const pid = param_ids[i];
       char const *key = ptk_anm2_edit_param_get_key(detail->edit, pid);
       char const *value = ptk_anm2_edit_param_get_value(detail->edit, pid);
+
+      char const *display_key = key;
+      char const *display_value = value;
+      if (effect_name.ptr && effect_name.size > 0) {
+        // Try to get translated key name
+        if (key) {
+          wchar_t const *translated =
+              ptk_i18n_get_translated_text_n(effect_name.ptr, effect_name.size, key, strlen(key));
+          if (translated) {
+            size_t const src_len = wcslen(translated);
+            size_t const utf8_len = ov_wchar_to_utf8_len(translated, src_len);
+            if (utf8_len > 0) {
+              if (!OV_ARRAY_GROW(&translated_key_utf8, utf8_len + 1)) {
+                OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+                goto cleanup;
+              }
+              ov_wchar_to_utf8(translated, src_len, translated_key_utf8, utf8_len + 1, NULL);
+              OV_ARRAY_SET_LENGTH(translated_key_utf8, utf8_len + 1);
+              display_key = translated_key_utf8;
+            }
+          }
+        }
+        // Try to get translated value
+        if (value) {
+          wchar_t const *translated =
+              ptk_i18n_get_translated_text_n(effect_name.ptr, effect_name.size, value, strlen(value));
+          if (translated) {
+            size_t const src_len = wcslen(translated);
+            size_t const utf8_len = ov_wchar_to_utf8_len(translated, src_len);
+            if (utf8_len > 0) {
+              if (!OV_ARRAY_GROW(&translated_value_utf8, utf8_len + 1)) {
+                OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+                goto cleanup;
+              }
+              ov_wchar_to_utf8(translated, src_len, translated_value_utf8, utf8_len + 1, NULL);
+              OV_ARRAY_SET_LENGTH(translated_value_utf8, utf8_len + 1);
+              display_value = translated_value_utf8;
+            }
+          }
+        }
+      }
+
       if (!anm2editor_detail_add_row(detail,
-                                     key,
-                                     value,
+                                     display_key,
+                                     display_value,
                                      &(struct anm2editor_detail_row){
                                          .type = anm2editor_detail_row_type_animation_param,
                                          .param_id = pid,
@@ -731,6 +853,12 @@ static bool refresh_item(struct anm2editor_detail *detail, uint32_t item_id, str
   success = true;
 
 cleanup:
+  if (translated_value_utf8) {
+    OV_ARRAY_DESTROY(&translated_value_utf8);
+  }
+  if (translated_key_utf8) {
+    OV_ARRAY_DESTROY(&translated_key_utf8);
+  }
   if (param_ids) {
     OV_ARRAY_DESTROY(&param_ids);
   }
@@ -1001,18 +1129,33 @@ void anm2editor_detail_start_edit(struct anm2editor_detail *detail, size_t row_i
     }
   }
 
-  // Get current text from the specified column
+  // Get text for editing
+  // For animation_param (column 0: key, column 1: value), use the original text from param_id
+  // instead of the translated text displayed in ListView
   wchar_t text[512] = {0};
-  SendMessageW(detail->listview,
-               LVM_GETITEMTEXTW,
-               (WPARAM)row_index,
-               (LPARAM) & (LVITEMW){
-                              .mask = LVIF_TEXT,
-                              .iItem = (int)row_index,
-                              .iSubItem = column,
-                              .pszText = text,
-                              .cchTextMax = sizeof(text) / sizeof(text[0]),
-                          });
+  if (row_info->type == anm2editor_detail_row_type_animation_param && detail->edit) {
+    char const *original = NULL;
+    if (column == 0) {
+      original = ptk_anm2_edit_param_get_key(detail->edit, row_info->param_id);
+    } else {
+      original = ptk_anm2_edit_param_get_value(detail->edit, row_info->param_id);
+    }
+    if (original) {
+      ov_utf8_to_wchar(original, strlen(original), text, sizeof(text) / sizeof(text[0]), NULL);
+    }
+  } else {
+    // Use displayed text from ListView
+    SendMessageW(detail->listview,
+                 LVM_GETITEMTEXTW,
+                 (WPARAM)row_index,
+                 (LPARAM) & (LVITEMW){
+                                .mask = LVIF_TEXT,
+                                .iItem = (int)row_index,
+                                .iSubItem = column,
+                                .pszText = text,
+                                .cchTextMax = sizeof(text) / sizeof(text[0]),
+                            });
+  }
 
   // Create edit control
   detail->edit_control = CreateWindowExW(0,
@@ -1264,6 +1407,146 @@ void anm2editor_detail_handle_view_event(struct anm2editor_detail *detail,
   case ptk_anm2_edit_view_detail_refresh:
     anm2editor_detail_refresh(detail);
     break;
+
+  case ptk_anm2_edit_view_detail_insert_param: {
+    // For now, fall back to full refresh since insert position handling
+    // with translation is complex. Can be optimized later if needed.
+    anm2editor_detail_refresh(detail);
+  } break;
+
+  case ptk_anm2_edit_view_detail_remove_param: {
+    // Find and remove the row by param_id
+    size_t const row_idx = find_row_by_param_id(detail, event->id);
+    if (row_idx != SIZE_MAX) {
+      anm2editor_detail_remove_row(detail, row_idx);
+    }
+  } break;
+
+  case ptk_anm2_edit_view_detail_update_param: {
+    // Find the row by param_id
+    size_t const row_idx = find_row_by_param_id(detail, event->id);
+    if (row_idx == SIZE_MAX) {
+      break;
+    }
+
+    // Get key and value
+    char const *key = ptk_anm2_edit_param_get_key(detail->edit, event->id);
+    char const *value = ptk_anm2_edit_param_get_value(detail->edit, event->id);
+
+    // Get effect_name for translation
+    struct ptk_anm2_script_mapper_result effect_name = {NULL, 0};
+    uint32_t const item_id = event->parent_id;
+    char const *script_name = ptk_anm2_item_get_script_name(ptk_anm2_edit_get_doc(detail->edit), item_id);
+    if (script_name) {
+      struct ptk_anm2_script_mapper const *mapper = ptk_anm2_edit_get_script_mapper(detail->edit);
+      if (mapper) {
+        effect_name = ptk_anm2_script_mapper_get_effect_name(mapper, script_name);
+      }
+    }
+
+    char const *display_key = key;
+    char const *display_value = value;
+    char *translated_key_utf8 = NULL;
+    char *translated_value_utf8 = NULL;
+
+    if (effect_name.ptr && effect_name.size > 0) {
+      // Try to get translated key name
+      if (key) {
+        wchar_t const *translated = ptk_i18n_get_translated_text_n(effect_name.ptr, effect_name.size, key, strlen(key));
+        if (translated) {
+          size_t const src_len = wcslen(translated);
+          size_t const utf8_len = ov_wchar_to_utf8_len(translated, src_len);
+          if (utf8_len > 0 && OV_ARRAY_GROW(&translated_key_utf8, utf8_len + 1)) {
+            ov_wchar_to_utf8(translated, src_len, translated_key_utf8, utf8_len + 1, NULL);
+            OV_ARRAY_SET_LENGTH(translated_key_utf8, utf8_len + 1);
+            display_key = translated_key_utf8;
+          }
+        }
+      }
+      // Try to get translated value
+      if (value) {
+        wchar_t const *translated =
+            ptk_i18n_get_translated_text_n(effect_name.ptr, effect_name.size, value, strlen(value));
+        if (translated) {
+          size_t const src_len = wcslen(translated);
+          size_t const utf8_len = ov_wchar_to_utf8_len(translated, src_len);
+          if (utf8_len > 0 && OV_ARRAY_GROW(&translated_value_utf8, utf8_len + 1)) {
+            ov_wchar_to_utf8(translated, src_len, translated_value_utf8, utf8_len + 1, NULL);
+            OV_ARRAY_SET_LENGTH(translated_value_utf8, utf8_len + 1);
+            display_value = translated_value_utf8;
+          }
+        }
+      }
+    }
+
+    anm2editor_detail_update_row(detail, row_idx, display_key, display_value);
+
+    if (translated_value_utf8) {
+      OV_ARRAY_DESTROY(&translated_value_utf8);
+    }
+    if (translated_key_utf8) {
+      OV_ARRAY_DESTROY(&translated_key_utf8);
+    }
+  } break;
+
+  case ptk_anm2_edit_view_detail_update_item: {
+    // Find the value_item row and update its name/value
+    // For single selection, there is only one value_item row (if any)
+    size_t const row_idx = rows_find_by_type(detail, anm2editor_detail_row_type_value_item);
+    if (row_idx == SIZE_MAX) {
+      // Also check for multisel_item (used in multiselection mode)
+      size_t const multisel_idx = find_row_by_item_id(detail, event->id);
+      if (multisel_idx != SIZE_MAX) {
+        // Update multisel_item row
+        char const *name = ptk_anm2_edit_item_get_name(detail->edit, event->id);
+        char const *value = ptk_anm2_edit_item_get_value(detail->edit, event->id);
+        anm2editor_detail_update_row(detail, multisel_idx, name, value);
+      }
+      break;
+    }
+
+    // Update value_item row with new name/value
+    char const *name = ptk_anm2_edit_item_get_name(detail->edit, event->id);
+    char const *value = ptk_anm2_edit_item_get_value(detail->edit, event->id);
+    anm2editor_detail_update_row(detail, row_idx, name, value);
+  } break;
+
+  case ptk_anm2_edit_view_detail_item_selected: {
+    // Add a new row for the selected item in multiselection mode
+    // Skip animation items as they are not shown in multiselection detail
+    if (ptk_anm2_edit_item_is_animation(detail->edit, event->id)) {
+      break;
+    }
+
+    // Calculate insert position based on treeview order
+    size_t const insert_pos = get_multisel_insert_position(detail, event->id);
+
+    // Get item name and value
+    char const *name = ptk_anm2_edit_item_get_name(detail->edit, event->id);
+    char const *value = ptk_anm2_edit_item_get_value(detail->edit, event->id);
+
+    // Insert the row
+    struct ov_error err = {0};
+    if (!anm2editor_detail_insert_row(detail,
+                                      insert_pos,
+                                      name,
+                                      value,
+                                      &(struct anm2editor_detail_row){
+                                          .type = anm2editor_detail_row_type_multisel_item,
+                                          .item_id = event->id,
+                                      },
+                                      &err)) {
+      OV_ERROR_REPORT(&err, NULL);
+    }
+  } break;
+
+  case ptk_anm2_edit_view_detail_item_deselected: {
+    // Remove the row for the deselected item
+    size_t const row_idx = find_row_by_item_id(detail, event->id);
+    if (row_idx != SIZE_MAX) {
+      anm2editor_detail_remove_row(detail, row_idx);
+    }
+  } break;
 
   case ptk_anm2_edit_view_treeview_rebuild:
   case ptk_anm2_edit_view_treeview_insert_selector:

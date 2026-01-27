@@ -84,9 +84,11 @@ NODISCARD bool ptk_alias_load_script_definitions(struct ptk_alias_script_definit
  * Represents a script that is both defined in INI and available in the current alias.
  */
 struct ptk_alias_available_script {
-  char *script_name; // e.g., "PSDToolKit.Blinker"
-  char *effect_name; // e.g., "目パチ@PSDToolKit"
-  bool selected;     // Selection state for dialog
+  char *script_name;              // e.g., "PSDToolKit.Blinker"
+  char *effect_name;              // e.g., "目パチ@PSDToolKit"
+  wchar_t const *translated_name; // Translated effect name for display (can be NULL)
+                                  // Points to SDK-managed memory, valid until language settings update
+  bool selected;                  // Selection state for dialog
 };
 
 /**
@@ -166,3 +168,14 @@ NODISCARD bool ptk_alias_extract_animation(char const *alias,
                                            char const *effect_name,
                                            struct ptk_alias_extracted_animation *anim,
                                            struct ov_error *err);
+
+/**
+ * @brief Populate translated names for available scripts
+ *
+ * Uses the AviUtl2 config handle to get translated effect names from
+ * language settings. The translated name is stored in translated_name field
+ * as a pointer to SDK-managed memory.
+ *
+ * @param scripts Available scripts to populate
+ */
+void ptk_alias_populate_translated_names(struct ptk_alias_available_scripts *scripts);

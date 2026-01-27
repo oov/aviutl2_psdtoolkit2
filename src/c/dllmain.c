@@ -37,6 +37,7 @@
 #include "anm2editor.h"
 #include "cache.h"
 #include "error.h"
+#include "i18n.h"
 #include "input.h"
 #include "ipc.h"
 #include "layer.h"
@@ -533,6 +534,11 @@ cleanup:
     }
   }
   return success;
+}
+
+void __declspec(dllexport) InitializeConfig(struct aviutl2_config_handle *config);
+void __declspec(dllexport) InitializeConfig(struct aviutl2_config_handle *config) {
+  ptk_i18n_set_config_handle(config);
 }
 
 void __declspec(dllexport) RegisterPlugin(struct aviutl2_host_app_table *host);

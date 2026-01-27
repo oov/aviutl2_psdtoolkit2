@@ -1,7 +1,9 @@
 #include "anm2_edit.h"
 
 #include "anm2.h"
+#include "anm2_script_mapper.h"
 #include "anm2_selection.h"
+#include "i18n.h"
 
 #include <ovarray.h>
 #include <ovmo.h>
@@ -13,6 +15,7 @@
 struct ptk_anm2_edit {
   struct ptk_anm2 *doc;
   struct anm2_selection *selection;
+  struct ptk_anm2_script_mapper *script_mapper;
   ptk_anm2_edit_view_callback view_callback;
   void *view_userdata;
   // Transaction tracking for buffering events during UNDO/REDO
@@ -121,11 +124,19 @@ static void on_state_change_internal(void *userdata) {
 NODISCARD struct ptk_anm2_edit *ptk_anm2_edit_create(struct ov_error *err) {
   struct ptk_anm2_edit *out = NULL;
   struct ptk_anm2 *doc = NULL;
+  struct ptk_anm2_script_mapper *script_mapper = NULL;
 
   doc = ptk_anm2_create(err);
   if (!doc) {
     OV_ERROR_ADD_TRACE(err);
     goto cleanup;
+  }
+
+  // Script mapper creation may fail (e.g., INI file not found), but this is not fatal
+  script_mapper = ptk_anm2_script_mapper_create(err);
+  if (!script_mapper) {
+    // Clear error and continue without script mapper - translation will be unavailable
+    OV_ERROR_REPORT(err, NULL);
   }
 
   if (!OV_REALLOC(&out, 1, sizeof(*out))) {
@@ -134,7 +145,9 @@ NODISCARD struct ptk_anm2_edit *ptk_anm2_edit_create(struct ov_error *err) {
   }
   *out = (struct ptk_anm2_edit){
       .doc = doc,
+      .script_mapper = script_mapper,
   };
+  script_mapper = NULL; // Ownership transferred
 
   out->selection = anm2_selection_create(doc, err);
   if (!out->selection) {
@@ -149,6 +162,9 @@ NODISCARD struct ptk_anm2_edit *ptk_anm2_edit_create(struct ov_error *err) {
   return out;
 
 cleanup:
+  if (script_mapper) {
+    ptk_anm2_script_mapper_destroy(&script_mapper);
+  }
   if (out) {
     OV_FREE(&out);
   }
@@ -168,11 +184,18 @@ void ptk_anm2_edit_destroy(struct ptk_anm2_edit **edit) {
     ptk_anm2_destroy(&p->doc);
   }
   anm2_selection_destroy(&p->selection);
+  if (p->script_mapper) {
+    ptk_anm2_script_mapper_destroy(&p->script_mapper);
+  }
   OV_FREE(&p);
   *edit = NULL;
 }
 
 struct ptk_anm2 const *ptk_anm2_edit_get_doc(struct ptk_anm2_edit const *edit) { return edit ? edit->doc : NULL; }
+
+struct ptk_anm2_script_mapper const *ptk_anm2_edit_get_script_mapper(struct ptk_anm2_edit const *edit) {
+  return edit ? edit->script_mapper : NULL;
+}
 
 void ptk_anm2_edit_set_view_callback(struct ptk_anm2_edit *edit, ptk_anm2_edit_view_callback callback, void *userdata) {
   if (!edit) {
@@ -228,10 +251,23 @@ NODISCARD bool ptk_anm2_edit_apply_treeview_selection(struct ptk_anm2_edit *edit
     OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
     return false;
   }
+
+  // Record state before selection change
+  size_t old_count = 0;
+  ptk_anm2_edit_get_selected_item_ids(edit, &old_count);
+  bool const was_multisel = (old_count > 1);
+  bool const was_selected = !is_selector && ptk_anm2_edit_is_item_selected(edit, item_id);
+
   if (!anm2_selection_apply_treeview_selection(
           edit->selection, item_id, is_selector, ctrl_pressed, shift_pressed, err)) {
     return false;
   }
+
+  // Record state after selection change
+  size_t new_count = 0;
+  ptk_anm2_edit_get_selected_item_ids(edit, &new_count);
+  bool const is_multisel = (new_count > 1);
+  bool const is_selected = !is_selector && ptk_anm2_edit_is_item_selected(edit, item_id);
 
   // Notify view of selection change (TreeView selection already changed via TVN_SELCHANGED)
   struct ptk_anm2_edit_view_event event = {
@@ -243,7 +279,33 @@ NODISCARD bool ptk_anm2_edit_apply_treeview_selection(struct ptk_anm2_edit *edit
       .selected = false,
   };
   notify_view(edit, &event);
-  notify_view(edit, &(struct ptk_anm2_edit_view_event){.op = ptk_anm2_edit_view_detail_refresh});
+
+  // Determine detail view update strategy
+  if (was_multisel != is_multisel) {
+    // Mode switch (single ↔ multi): full refresh
+    notify_view(edit, &(struct ptk_anm2_edit_view_event){.op = ptk_anm2_edit_view_detail_refresh});
+  } else if (is_multisel) {
+    // Within multiselection mode: differential update
+    if (!was_selected && is_selected) {
+      // Item added to multiselection
+      notify_view(edit,
+                  &(struct ptk_anm2_edit_view_event){
+                      .op = ptk_anm2_edit_view_detail_item_selected,
+                      .id = item_id,
+                  });
+    } else if (was_selected && !is_selected) {
+      // Item removed from multiselection
+      notify_view(edit,
+                  &(struct ptk_anm2_edit_view_event){
+                      .op = ptk_anm2_edit_view_detail_item_deselected,
+                      .id = item_id,
+                  });
+    }
+    // If selection unchanged within multisel mode, no detail event needed
+  } else {
+    // Single selection mode: full refresh
+    notify_view(edit, &(struct ptk_anm2_edit_view_event){.op = ptk_anm2_edit_view_detail_refresh});
+  }
 
   return true;
 }
@@ -334,6 +396,19 @@ void ptk_anm2_edit_update_on_doc_op(
 
   case ptk_anm2_op_item_set_name:
   case ptk_anm2_op_item_set_value:
+    event.op = ptk_anm2_edit_view_treeview_update_item;
+    notify_view(edit, &event);
+    // If the item is selected, emit detail_update_item for differential update
+    // Otherwise, emit detail_refresh for full refresh
+    if (ptk_anm2_edit_is_item_selected(edit, id)) {
+      event.op = ptk_anm2_edit_view_detail_update_item;
+      notify_view(edit, &event);
+    } else {
+      event.op = ptk_anm2_edit_view_detail_refresh;
+      notify_view(edit, &event);
+    }
+    break;
+
   case ptk_anm2_op_item_set_script_name:
     event.op = ptk_anm2_edit_view_treeview_update_item;
     notify_view(edit, &event);
@@ -347,12 +422,29 @@ void ptk_anm2_edit_update_on_doc_op(
     break;
 
   case ptk_anm2_op_param_insert:
+    // Param insert: emit detail_insert_param if parent item is selected
+    if (ptk_anm2_edit_is_item_selected(edit, parent_id)) {
+      event.op = ptk_anm2_edit_view_detail_insert_param;
+      // id = param_id, parent_id = item_id
+      notify_view(edit, &event);
+    }
+    break;
+
   case ptk_anm2_op_param_remove:
+    // Param remove: emit detail_remove_param if parent item is selected
+    if (ptk_anm2_edit_is_item_selected(edit, parent_id)) {
+      event.op = ptk_anm2_edit_view_detail_remove_param;
+      notify_view(edit, &event);
+    }
+    break;
+
   case ptk_anm2_op_param_set_key:
   case ptk_anm2_op_param_set_value:
-    // Param changes only affect detail view
-    event.op = ptk_anm2_edit_view_detail_refresh;
-    notify_view(edit, &event);
+    // Param update: emit detail_update_param if parent item is selected
+    if (ptk_anm2_edit_is_item_selected(edit, parent_id)) {
+      event.op = ptk_anm2_edit_view_detail_update_param;
+      notify_view(edit, &event);
+    }
     break;
 
   case ptk_anm2_op_set_label:
@@ -1434,16 +1526,40 @@ void ptk_anm2_edit_format_item_display_name(struct ptk_anm2_edit const *edit,
   if (!edit || !edit->doc || !out || out_len == 0) {
     return;
   }
+
   char const *name = ptk_anm2_item_get_name(edit->doc, item_id);
   if (!name || name[0] == '\0') {
     name = pgettext("anm2editor", "(Unnamed Item)");
   }
-  if (ptk_anm2_item_is_animation(edit->doc, item_id)) {
-    char const *script_name = ptk_anm2_item_get_script_name(edit->doc, item_id);
-    ov_snprintf_wchar(out, out_len, L"%1$hs%2$hs", L"[%1$hs] %2$hs", script_name, name);
-  } else {
+
+  if (!ptk_anm2_item_is_animation(edit->doc, item_id)) {
     ov_snprintf_wchar(out, out_len, L"%1$hs", L"%1$hs", name);
+    return;
   }
+
+  // For animation items, get effect_name from script_mapper
+  char const *script_name = ptk_anm2_item_get_script_name(edit->doc, item_id);
+  struct ptk_anm2_script_mapper_result effect_name = {NULL, 0};
+  if (script_name && edit->script_mapper) {
+    effect_name = ptk_anm2_script_mapper_get_effect_name(edit->script_mapper, script_name);
+  }
+  if (!effect_name.ptr || effect_name.size == 0) {
+    // No effect_name found, show name only
+    ov_snprintf_wchar(out, out_len, L"%1$hs", L"%1$hs", name);
+    return;
+  }
+
+  // Try to get translated effect name, fallback to original effect_name
+  wchar_t const *translated =
+      ptk_i18n_get_translated_text_n(effect_name.ptr, effect_name.size, effect_name.ptr, effect_name.size);
+  if (translated) {
+    ov_snprintf_wchar(out, out_len, L"%1$ls%2$hs", L"[%1$ls] %2$hs", translated, name);
+    return;
+  }
+
+  wchar_t effect_name_w[256];
+  ov_utf8_to_wchar(effect_name.ptr, effect_name.size, effect_name_w, 256, NULL);
+  ov_snprintf_wchar(out, out_len, L"%1$ls%2$hs", L"[%1$ls] %2$hs", effect_name_w, name);
 }
 
 void ptk_anm2_edit_get_editable_name(
@@ -1473,6 +1589,9 @@ void ptk_anm2_edit_ptkl_targets_free(struct ptk_anm2_edit_ptkl_targets *targets)
     struct ptk_anm2_edit_ptkl_target *t = &targets->items[i];
     if (t->selector_name) {
       OV_ARRAY_DESTROY(&t->selector_name);
+    }
+    if (t->display_name) {
+      OV_ARRAY_DESTROY(&t->display_name);
     }
     if (t->effect_name) {
       OV_ARRAY_DESTROY(&t->effect_name);
@@ -1507,9 +1626,33 @@ cleanup:
   return success;
 }
 
+static bool strdup_to_array_internal_n(char **out, char const *src, size_t src_len, struct ov_error *const err) {
+  if (!src || src_len == 0) {
+    *out = NULL;
+    return true;
+  }
+
+  bool success = false;
+
+  if (!OV_ARRAY_GROW(out, src_len + 1)) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+    goto cleanup;
+  }
+  memcpy(*out, src, src_len);
+  (*out)[src_len] = '\0';
+  OV_ARRAY_SET_LENGTH(*out, src_len);
+
+  success = true;
+
+cleanup:
+  return success;
+}
+
 static bool add_ptkl_target_internal(struct ptk_anm2_edit_ptkl_targets *targets,
                                      char const *selector_name,
+                                     char const *display_name,
                                      char const *effect_name,
+                                     size_t effect_name_len,
                                      char const *param_key,
                                      uint32_t selector_id,
                                      uint32_t item_id,
@@ -1535,7 +1678,11 @@ static bool add_ptkl_target_internal(struct ptk_anm2_edit_ptkl_targets *targets,
     OV_ERROR_ADD_TRACE(err);
     goto cleanup;
   }
-  if (!strdup_to_array_internal(&t->effect_name, effect_name, err)) {
+  if (!strdup_to_array_internal(&t->display_name, display_name, err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+  if (!strdup_to_array_internal_n(&t->effect_name, effect_name, effect_name_len, err)) {
     OV_ERROR_ADD_TRACE(err);
     goto cleanup;
   }
@@ -1593,12 +1740,6 @@ bool ptk_anm2_edit_collect_ptkl_targets(struct ptk_anm2_edit *edit,
     // Get all item IDs for this selector
     item_ids = ptk_anm2_get_item_ids(edit->doc, selector_id, err);
     if (!item_ids) {
-      // If selector exists but has no items, this is not an error
-      if (ptk_anm2_item_count(edit->doc, selector_id) == 0) {
-        OV_ERROR_DESTROY(err);
-        success = true;
-        goto cleanup;
-      }
       OV_ERROR_ADD_TRACE(err);
       goto cleanup;
     }
@@ -1610,7 +1751,14 @@ bool ptk_anm2_edit_collect_ptkl_targets(struct ptk_anm2_edit *edit,
         continue;
       }
 
-      char const *name = ptk_anm2_item_get_name(edit->doc, item_id);
+      char const *display_name = ptk_anm2_item_get_name(edit->doc, item_id);
+
+      // Get effect_name for i18n lookup (from script_mapper via script_name)
+      struct ptk_anm2_script_mapper_result effect_name = {NULL, 0};
+      char const *script_name = ptk_anm2_item_get_script_name(edit->doc, item_id);
+      if (script_name && edit->script_mapper) {
+        effect_name = ptk_anm2_script_mapper_get_effect_name(edit->script_mapper, script_name);
+      }
 
       // Get all parameter IDs for this item
       if (param_ids) {
@@ -1618,11 +1766,6 @@ bool ptk_anm2_edit_collect_ptkl_targets(struct ptk_anm2_edit *edit,
       }
       param_ids = ptk_anm2_get_param_ids(edit->doc, item_id, err);
       if (!param_ids) {
-        // If item exists but has no params, this is not an error
-        if (ptk_anm2_param_count(edit->doc, item_id) == 0) {
-          OV_ERROR_DESTROY(err);
-          continue;
-        }
         OV_ERROR_ADD_TRACE(err);
         goto cleanup;
       }
@@ -1641,7 +1784,16 @@ bool ptk_anm2_edit_collect_ptkl_targets(struct ptk_anm2_edit *edit,
           continue;
         }
 
-        if (!add_ptkl_target_internal(targets, group, name, key, selector_id, item_id, param_id, err)) {
+        if (!add_ptkl_target_internal(targets,
+                                      group,
+                                      display_name,
+                                      effect_name.ptr,
+                                      effect_name.size,
+                                      key,
+                                      selector_id,
+                                      item_id,
+                                      param_id,
+                                      err)) {
           OV_ERROR_ADD_TRACE(err);
           ptk_anm2_edit_ptkl_targets_free(targets);
           goto cleanup;

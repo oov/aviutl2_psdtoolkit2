@@ -4253,15 +4253,32 @@ static void test_undo_callback_param_set_key(void) {
 
   TEST_ASSERT_SUCCEEDED(ptk_anm2_param_set_key(doc, param_id, "NewKey", &err), &err);
 
-  callback_tracker_clear(&tracker);
-  TEST_ASSERT_SUCCEEDED(ptk_anm2_undo(doc, &err), &err);
-
+  // Verify the forward operation callback
   TEST_CHECK(tracker.count >= 1);
   bool found = false;
   for (size_t i = 0; i < tracker.count; ++i) {
     if (tracker.records[i].op_type == ptk_anm2_op_param_set_key) {
       TEST_CHECK(tracker.records[i].id == param_id);
+      TEST_MSG("param_set_key: want id=%u, got %u", param_id, tracker.records[i].id);
+      TEST_CHECK(tracker.records[i].parent_id == item_id);
+      TEST_MSG("param_set_key: want parent_id=%u, got %u", item_id, tracker.records[i].parent_id);
+      found = true;
+      break;
+    }
+  }
+  TEST_CHECK(found);
+
+  callback_tracker_clear(&tracker);
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_undo(doc, &err), &err);
+
+  TEST_CHECK(tracker.count >= 1);
+  found = false;
+  for (size_t i = 0; i < tracker.count; ++i) {
+    if (tracker.records[i].op_type == ptk_anm2_op_param_set_key) {
+      TEST_CHECK(tracker.records[i].id == param_id);
       TEST_MSG("param_set_key UNDO: want id=%u, got %u", param_id, tracker.records[i].id);
+      TEST_CHECK(tracker.records[i].parent_id == item_id);
+      TEST_MSG("param_set_key UNDO: want parent_id=%u, got %u", item_id, tracker.records[i].parent_id);
       found = true;
       break;
     }
@@ -4289,15 +4306,32 @@ static void test_undo_callback_param_set_value(void) {
 
   TEST_ASSERT_SUCCEEDED(ptk_anm2_param_set_value(doc, param_id, "NewValue", &err), &err);
 
-  callback_tracker_clear(&tracker);
-  TEST_ASSERT_SUCCEEDED(ptk_anm2_undo(doc, &err), &err);
-
+  // Verify the forward operation callback
   TEST_CHECK(tracker.count >= 1);
   bool found = false;
   for (size_t i = 0; i < tracker.count; ++i) {
     if (tracker.records[i].op_type == ptk_anm2_op_param_set_value) {
       TEST_CHECK(tracker.records[i].id == param_id);
+      TEST_MSG("param_set_value: want id=%u, got %u", param_id, tracker.records[i].id);
+      TEST_CHECK(tracker.records[i].parent_id == item_id);
+      TEST_MSG("param_set_value: want parent_id=%u, got %u", item_id, tracker.records[i].parent_id);
+      found = true;
+      break;
+    }
+  }
+  TEST_CHECK(found);
+
+  callback_tracker_clear(&tracker);
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_undo(doc, &err), &err);
+
+  TEST_CHECK(tracker.count >= 1);
+  found = false;
+  for (size_t i = 0; i < tracker.count; ++i) {
+    if (tracker.records[i].op_type == ptk_anm2_op_param_set_value) {
+      TEST_CHECK(tracker.records[i].id == param_id);
       TEST_MSG("param_set_value UNDO: want id=%u, got %u", param_id, tracker.records[i].id);
+      TEST_CHECK(tracker.records[i].parent_id == item_id);
+      TEST_MSG("param_set_value UNDO: want parent_id=%u, got %u", item_id, tracker.records[i].parent_id);
       found = true;
       break;
     }

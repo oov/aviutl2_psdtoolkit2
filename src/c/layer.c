@@ -15,6 +15,7 @@
 #include "anm2_edit.h"
 #include "anm2editor.h"
 #include "error.h"
+#include "i18n.h"
 #include "ini_reader.h"
 #include "logf.h"
 #include "win32.h"
@@ -983,6 +984,7 @@ static bool build_popup_menu(HMENU *const menu,
     size_t const targets_len = OV_ARRAY_LENGTH(targets->items);
     struct {
       char const *name;
+      wchar_t const *translated_name; // NULL if no translation, points to SDK-managed memory
       HMENU menu;
     } submenus[64];
     size_t submenu_count = 0;
@@ -991,9 +993,11 @@ static bool build_popup_menu(HMENU *const menu,
       struct ptkl_target_item const *const t = &targets->items[i];
 
       HMENU submenu = NULL;
+      wchar_t const *translated_effect = NULL;
       for (size_t j = 0; j < submenu_count; j++) {
         if (strcmp(submenus[j].name, t->effect_name) == 0) {
           submenu = submenus[j].menu;
+          translated_effect = submenus[j].translated_name;
           break;
         }
       }
@@ -1004,18 +1008,40 @@ static bool build_popup_menu(HMENU *const menu,
           OV_ERROR_SET_HRESULT(err, HRESULT_FROM_WIN32(GetLastError()));
           goto cleanup;
         }
+        // Get translated effect name (use original if translation not available)
+        translated_effect = ptk_i18n_get_translated_text(t->effect_name, t->effect_name);
         wchar_t effect_name_w[256];
-        ov_snprintf_char2wchar(
-            effect_name_w, 256, "%1$hs", pgettext("layer", "%1$hs (Selected in AviUtl)"), t->effect_name);
+        if (translated_effect) {
+          // Convert translated_effect to UTF-8 for formatting
+          char translated_effect_utf8[256];
+          ov_wchar_to_utf8(translated_effect, wcslen(translated_effect), translated_effect_utf8, 256, NULL);
+          ov_snprintf_char2wchar(
+              effect_name_w, 256, "%1$hs", pgettext("layer", "%1$hs (Selected in AviUtl)"), translated_effect_utf8);
+        } else {
+          ov_snprintf_char2wchar(
+              effect_name_w, 256, "%1$hs", pgettext("layer", "%1$hs (Selected in AviUtl)"), t->effect_name);
+        }
         AppendMenuW(*menu, MF_POPUP, (UINT_PTR)submenu, effect_name_w);
         submenus[submenu_count].name = t->effect_name;
+        submenus[submenu_count].translated_name = translated_effect;
         submenus[submenu_count].menu = submenu;
         submenu_count++;
       }
 
+      // Get translated item name (use original if translation not available)
+      wchar_t const *const translated_item = ptk_i18n_get_translated_text(t->effect_name, t->item_name);
+
       wchar_t text[256];
-      ov_snprintf_char2wchar(
-          text, 256, "%1$hs%2$hs", gettext("Assign \"%1$hs\" to \"%2$hs\""), item_name, t->item_name);
+      if (translated_item) {
+        // Convert translated_item to UTF-8 for formatting
+        char translated_item_utf8[256];
+        ov_wchar_to_utf8(translated_item, wcslen(translated_item), translated_item_utf8, 256, NULL);
+        ov_snprintf_char2wchar(
+            text, 256, "%1$hs%2$hs", gettext("Assign \"%1$hs\" to \"%2$hs\""), item_name, translated_item_utf8);
+      } else {
+        ov_snprintf_char2wchar(
+            text, 256, "%1$hs%2$hs", gettext("Assign \"%1$hs\" to \"%2$hs\""), item_name, t->item_name);
+      }
       AppendMenuW(submenu, MF_STRING, (UINT)(menu_cmd_assign_base + i), text);
     }
   }
@@ -1028,6 +1054,7 @@ static bool build_popup_menu(HMENU *const menu,
       size_t const targets_len = OV_ARRAY_LENGTH(anm2edit_selected_targets->items);
       struct {
         char const *name;
+        wchar_t const *translated_name; // NULL if no translation, points to SDK-managed memory
         HMENU menu;
       } submenus[64];
       size_t submenu_count = 0;
@@ -1036,9 +1063,11 @@ static bool build_popup_menu(HMENU *const menu,
         struct ptk_anm2_edit_ptkl_target const *const t = &anm2edit_selected_targets->items[i];
 
         HMENU submenu = NULL;
+        wchar_t const *translated_display = NULL;
         for (size_t j = 0; j < submenu_count; j++) {
-          if (strcmp(submenus[j].name, t->effect_name) == 0) {
+          if (strcmp(submenus[j].name, t->display_name) == 0) {
             submenu = submenus[j].menu;
+            translated_display = submenus[j].translated_name;
             break;
           }
         }
@@ -1049,18 +1078,48 @@ static bool build_popup_menu(HMENU *const menu,
             OV_ERROR_SET_HRESULT(err, HRESULT_FROM_WIN32(GetLastError()));
             goto cleanup;
           }
-          wchar_t effect_name_w[256];
-          ov_snprintf_char2wchar(
-              effect_name_w, 256, "%1$hs", pgettext("layer", "%1$hs (Selected in anm2 Editor)"), t->effect_name);
-          AppendMenuW(*menu, MF_POPUP, (UINT_PTR)submenu, effect_name_w);
-          submenus[submenu_count].name = t->effect_name;
+          // Get translated display name (use effect_name as section for translation)
+          if (t->effect_name) {
+            translated_display = ptk_i18n_get_translated_text(t->effect_name, t->effect_name);
+          }
+          wchar_t display_name_w[256];
+          if (translated_display) {
+            // Convert translated_display to UTF-8 for formatting
+            char translated_display_utf8[256];
+            ov_wchar_to_utf8(translated_display, wcslen(translated_display), translated_display_utf8, 256, NULL);
+            ov_snprintf_char2wchar(display_name_w,
+                                   256,
+                                   "%1$hs",
+                                   pgettext("layer", "%1$hs (Selected in anm2 Editor)"),
+                                   translated_display_utf8);
+          } else {
+            ov_snprintf_char2wchar(
+                display_name_w, 256, "%1$hs", pgettext("layer", "%1$hs (Selected in anm2 Editor)"), t->display_name);
+          }
+          AppendMenuW(*menu, MF_POPUP, (UINT_PTR)submenu, display_name_w);
+          submenus[submenu_count].name = t->display_name;
+          submenus[submenu_count].translated_name = translated_display;
           submenus[submenu_count].menu = submenu;
           submenu_count++;
         }
 
+        // Get translated param_key (use effect_name as section)
+        wchar_t const *translated_param = NULL;
+        if (t->effect_name) {
+          translated_param = ptk_i18n_get_translated_text(t->effect_name, t->param_key);
+        }
+
         wchar_t text[256];
-        ov_snprintf_char2wchar(
-            text, 256, "%1$hs%2$hs", gettext("Assign \"%1$hs\" to \"%2$hs\""), item_name, t->param_key);
+        if (translated_param) {
+          // Convert translated_param to UTF-8 for formatting
+          char translated_param_utf8[256];
+          ov_wchar_to_utf8(translated_param, wcslen(translated_param), translated_param_utf8, 256, NULL);
+          ov_snprintf_char2wchar(
+              text, 256, "%1$hs%2$hs", gettext("Assign \"%1$hs\" to \"%2$hs\""), item_name, translated_param_utf8);
+        } else {
+          ov_snprintf_char2wchar(
+              text, 256, "%1$hs%2$hs", gettext("Assign \"%1$hs\" to \"%2$hs\""), item_name, t->param_key);
+        }
         AppendMenuW(submenu, MF_STRING, (UINT)(menu_cmd_anm2editor_selected_assign_base + i), text);
       }
     } else {

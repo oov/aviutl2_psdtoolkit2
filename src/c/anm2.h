@@ -749,6 +749,7 @@ uint32_t ptk_anm2_param_get_id(struct ptk_anm2 const *doc, size_t sel_idx, size_
  * @brief Get all item IDs for a selector
  *
  * Returns an array of item IDs belonging to the specified selector.
+ * If the selector has no items, returns an empty array (length 0), not NULL.
  * Caller must free the returned array with OV_ARRAY_DESTROY.
  *
  * @param doc Document handle
@@ -762,6 +763,7 @@ NODISCARD uint32_t *ptk_anm2_get_item_ids(struct ptk_anm2 const *doc, uint32_t s
  * @brief Get all parameter IDs for an item
  *
  * Returns an array of parameter IDs belonging to the specified item.
+ * If the item has no parameters, returns an empty array (length 0), not NULL.
  * Caller must free the returned array with OV_ARRAY_DESTROY.
  *
  * @param doc Document handle

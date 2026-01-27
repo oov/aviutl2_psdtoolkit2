@@ -898,6 +898,7 @@ struct view_callback_log {
   enum ptk_anm2_edit_view_op ops[32];
   uint32_t ids[32];
   uint32_t before_ids[32];
+  uint32_t parent_ids[32];
 };
 
 static void view_callback_logger(void *userdata, struct ptk_anm2_edit_view_event const *event) {
@@ -906,6 +907,7 @@ static void view_callback_logger(void *userdata, struct ptk_anm2_edit_view_event
     log->ops[log->count] = event->op;
     log->ids[log->count] = event->id;
     log->before_ids[log->count] = event->before_id;
+    log->parent_ids[log->count] = event->parent_id;
     log->count++;
   }
 }
@@ -1745,6 +1747,432 @@ static void test_would_move_items_selection_range(void) {
   ptk_anm2_edit_destroy(&edit);
 }
 
+// ============================================================================
+// Detail view differential update event tests
+// ============================================================================
+
+// Test: param insert emits detail_insert_param when item is selected
+static void test_detail_param_insert_when_selected(void) {
+  struct ov_error err = {0};
+  struct ptk_anm2_edit *edit = NULL;
+  struct view_callback_log log = {0};
+
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
+
+  // Create structure
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_insert_animation_item(edit, group_id, "Script", "Display", &err), &err);
+  uint32_t item_id = ptk_anm2_item_get_id(doc, 0, 0);
+  TEST_CHECK(item_id != 0);
+
+  // Select the item
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, item_id, false, false, false, &err), &err);
+
+  // Set up callback
+  ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
+
+  // Add parameter - should emit detail_insert_param
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_param_add_for_focus(edit, "Key", &err), &err);
+
+  // Verify detail_insert_param event was emitted
+  bool found_insert = false;
+  for (size_t i = 0; i < log.count; ++i) {
+    if (log.ops[i] == ptk_anm2_edit_view_detail_insert_param) {
+      found_insert = true;
+      TEST_CHECK(log.parent_ids[i] == item_id); // parent_id should be item_id
+    }
+  }
+  TEST_CHECK(found_insert);
+  TEST_MSG("detail_insert_param should be emitted when adding param to selected item");
+
+  ptk_anm2_edit_destroy(&edit);
+}
+
+// Test: param insert does not emit detail event when item is not selected
+static void test_detail_param_insert_when_not_selected(void) {
+  struct ov_error err = {0};
+  struct ptk_anm2_edit *edit = NULL;
+  struct view_callback_log log = {0};
+
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
+
+  // Create structure
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
+  uint32_t item_id = ptk_anm2_item_insert_animation(doc, group_id, "Script", "Display", &err);
+  TEST_CHECK(item_id != 0);
+
+  // Do NOT select the item - set up callback first
+  ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
+
+  // Add parameter directly via doc layer (bypasses selection)
+  uint32_t param_id = ptk_anm2_param_insert(doc, item_id, 0, "Key", "Value", &err);
+  TEST_ASSERT_SUCCEEDED(param_id != 0, &err);
+
+  // Verify detail_insert_param event was NOT emitted
+  bool found_insert = false;
+  for (size_t i = 0; i < log.count; ++i) {
+    if (log.ops[i] == ptk_anm2_edit_view_detail_insert_param) {
+      found_insert = true;
+    }
+  }
+  TEST_CHECK(!found_insert);
+  TEST_MSG("detail_insert_param should NOT be emitted when adding param to unselected item");
+
+  ptk_anm2_edit_destroy(&edit);
+}
+
+// Test: param update emits detail_update_param when item is selected
+static void test_detail_param_update_when_selected(void) {
+  struct ov_error err = {0};
+  struct ptk_anm2_edit *edit = NULL;
+  struct view_callback_log log = {0};
+
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
+
+  // Create structure with param
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
+  uint32_t item_id = ptk_anm2_item_insert_animation(doc, group_id, "Script", "Display", &err);
+  TEST_CHECK(item_id != 0);
+  uint32_t param_id = ptk_anm2_param_insert(doc, item_id, 0, "Key", "Value", &err);
+  TEST_ASSERT_SUCCEEDED(param_id != 0, &err);
+
+  // Select the item
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, item_id, false, false, false, &err), &err);
+
+  // Set up callback
+  ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
+
+  // Update param key
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_param_set_key(edit, param_id, "NewKey", &err), &err);
+
+  // Verify detail_update_param event was emitted
+  bool found_update = false;
+  for (size_t i = 0; i < log.count; ++i) {
+    if (log.ops[i] == ptk_anm2_edit_view_detail_update_param) {
+      found_update = true;
+      TEST_CHECK(log.ids[i] == param_id);
+      TEST_CHECK(log.parent_ids[i] == item_id);
+    }
+  }
+  TEST_CHECK(found_update);
+  TEST_MSG("detail_update_param should be emitted when updating param of selected item");
+
+  ptk_anm2_edit_destroy(&edit);
+}
+
+// Test: param remove emits detail_remove_param when item is selected
+static void test_detail_param_remove_when_selected(void) {
+  struct ov_error err = {0};
+  struct ptk_anm2_edit *edit = NULL;
+  struct view_callback_log log = {0};
+
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
+
+  // Create structure with param
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
+  uint32_t item_id = ptk_anm2_item_insert_animation(doc, group_id, "Script", "Display", &err);
+  TEST_CHECK(item_id != 0);
+  uint32_t param_id = ptk_anm2_param_insert(doc, item_id, 0, "Key", "Value", &err);
+  TEST_ASSERT_SUCCEEDED(param_id != 0, &err);
+
+  // Select the item
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, item_id, false, false, false, &err), &err);
+
+  // Set up callback
+  ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
+
+  // Remove param
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_param_remove(edit, param_id, &err), &err);
+
+  // Verify detail_remove_param event was emitted
+  bool found_remove = false;
+  for (size_t i = 0; i < log.count; ++i) {
+    if (log.ops[i] == ptk_anm2_edit_view_detail_remove_param) {
+      found_remove = true;
+      TEST_CHECK(log.ids[i] == param_id);
+      TEST_CHECK(log.parent_ids[i] == item_id);
+    }
+  }
+  TEST_CHECK(found_remove);
+  TEST_MSG("detail_remove_param should be emitted when removing param from selected item");
+
+  ptk_anm2_edit_destroy(&edit);
+}
+
+// Test: item name/value change emits detail_update_item when item is selected
+static void test_detail_item_update_when_selected(void) {
+  struct ov_error err = {0};
+  struct ptk_anm2_edit *edit = NULL;
+  struct view_callback_log log = {0};
+
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
+
+  // Create structure with value item
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
+  uint32_t item_id = ptk_anm2_item_insert_value(doc, group_id, "Name", "Value", &err);
+  TEST_ASSERT_SUCCEEDED(item_id != 0, &err);
+
+  // Select the item
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, item_id, false, false, false, &err), &err);
+
+  // Set up callback
+  ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
+
+  // Update item name
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_rename_item(edit, item_id, "NewName", &err), &err);
+
+  // Verify detail_update_item event was emitted
+  bool found_update = false;
+  for (size_t i = 0; i < log.count; ++i) {
+    if (log.ops[i] == ptk_anm2_edit_view_detail_update_item) {
+      found_update = true;
+      TEST_CHECK(log.ids[i] == item_id);
+    }
+  }
+  TEST_CHECK(found_update);
+  TEST_MSG("detail_update_item should be emitted when renaming selected item");
+
+  // Reset log and test value change
+  log.count = 0;
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_set_item_value(edit, item_id, "NewValue", &err), &err);
+
+  found_update = false;
+  for (size_t i = 0; i < log.count; ++i) {
+    if (log.ops[i] == ptk_anm2_edit_view_detail_update_item) {
+      found_update = true;
+      TEST_CHECK(log.ids[i] == item_id);
+    }
+  }
+  TEST_CHECK(found_update);
+  TEST_MSG("detail_update_item should be emitted when changing value of selected item");
+
+  ptk_anm2_edit_destroy(&edit);
+}
+
+// Test: item update does not emit detail event when item is not selected
+static void test_detail_item_update_when_not_selected(void) {
+  struct ov_error err = {0};
+  struct ptk_anm2_edit *edit = NULL;
+  struct view_callback_log log = {0};
+
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
+
+  // Create structure with two items
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
+  uint32_t item1_id = ptk_anm2_item_insert_value(doc, group_id, "Item1", "Value1", &err);
+  TEST_ASSERT_SUCCEEDED(item1_id != 0, &err);
+  uint32_t item2_id = ptk_anm2_item_insert_value(doc, group_id, "Item2", "Value2", &err);
+  TEST_ASSERT_SUCCEEDED(item2_id != 0, &err);
+
+  // Select item1
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, item1_id, false, false, false, &err), &err);
+
+  // Set up callback
+  ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
+
+  // Update item2 (not selected)
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_rename_item(edit, item2_id, "NewName", &err), &err);
+
+  // Verify detail_update_item event was NOT emitted
+  bool found_detail_update = false;
+  for (size_t i = 0; i < log.count; ++i) {
+    if (log.ops[i] == ptk_anm2_edit_view_detail_update_item) {
+      found_detail_update = true;
+    }
+  }
+  TEST_CHECK(!found_detail_update);
+  TEST_MSG("detail_update_item should NOT be emitted when updating non-selected item");
+
+  // But treeview_update_item should still be emitted
+  bool found_treeview_update = false;
+  for (size_t i = 0; i < log.count; ++i) {
+    if (log.ops[i] == ptk_anm2_edit_view_treeview_update_item) {
+      found_treeview_update = true;
+    }
+  }
+  TEST_CHECK(found_treeview_update);
+  TEST_MSG("treeview_update_item should still be emitted");
+
+  ptk_anm2_edit_destroy(&edit);
+}
+
+// Test: adding to multiselection emits item_selected event
+static void test_detail_multisel_item_selected(void) {
+  struct ov_error err = {0};
+  struct ptk_anm2_edit *edit = NULL;
+  struct view_callback_log log = {0};
+
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
+
+  // Create structure with three value items
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
+  uint32_t item1_id = ptk_anm2_item_insert_value(doc, group_id, "Item1", "Value1", &err);
+  TEST_ASSERT_SUCCEEDED(item1_id != 0, &err);
+  uint32_t item2_id = ptk_anm2_item_insert_value(doc, group_id, "Item2", "Value2", &err);
+  TEST_ASSERT_SUCCEEDED(item2_id != 0, &err);
+  uint32_t item3_id = ptk_anm2_item_insert_value(doc, group_id, "Item3", "Value3", &err);
+  TEST_ASSERT_SUCCEEDED(item3_id != 0, &err);
+
+  // Select item1, then ctrl+click item2 to create multiselection
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, item1_id, false, false, false, &err), &err);
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, item2_id, false, true, false, &err), &err);
+
+  // Set up callback
+  ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
+
+  // ctrl+click item3 to add to multiselection
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, item3_id, false, true, false, &err), &err);
+
+  // Verify detail_item_selected event was emitted for item3
+  bool found_selected = false;
+  for (size_t i = 0; i < log.count; ++i) {
+    if (log.ops[i] == ptk_anm2_edit_view_detail_item_selected) {
+      found_selected = true;
+      TEST_CHECK(log.ids[i] == item3_id);
+    }
+  }
+  TEST_CHECK(found_selected);
+  TEST_MSG("detail_item_selected should be emitted when adding to multiselection");
+
+  // Verify detail_refresh was NOT emitted (differential update)
+  bool found_refresh = false;
+  for (size_t i = 0; i < log.count; ++i) {
+    if (log.ops[i] == ptk_anm2_edit_view_detail_refresh) {
+      found_refresh = true;
+    }
+  }
+  TEST_CHECK(!found_refresh);
+  TEST_MSG("detail_refresh should NOT be emitted when adding to multiselection");
+
+  ptk_anm2_edit_destroy(&edit);
+}
+
+// Test: removing from multiselection emits item_deselected event
+static void test_detail_multisel_item_deselected(void) {
+  struct ov_error err = {0};
+  struct ptk_anm2_edit *edit = NULL;
+  struct view_callback_log log = {0};
+
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
+
+  // Create structure with three value items
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
+  uint32_t item1_id = ptk_anm2_item_insert_value(doc, group_id, "Item1", "Value1", &err);
+  TEST_ASSERT_SUCCEEDED(item1_id != 0, &err);
+  uint32_t item2_id = ptk_anm2_item_insert_value(doc, group_id, "Item2", "Value2", &err);
+  TEST_ASSERT_SUCCEEDED(item2_id != 0, &err);
+  uint32_t item3_id = ptk_anm2_item_insert_value(doc, group_id, "Item3", "Value3", &err);
+  TEST_ASSERT_SUCCEEDED(item3_id != 0, &err);
+
+  // Create multiselection with all three items
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, item1_id, false, false, false, &err), &err);
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, item2_id, false, true, false, &err), &err);
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, item3_id, false, true, false, &err), &err);
+
+  // Set up callback
+  ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
+
+  // ctrl+click item2 to remove from multiselection
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, item2_id, false, true, false, &err), &err);
+
+  // Verify detail_item_deselected event was emitted for item2
+  bool found_deselected = false;
+  for (size_t i = 0; i < log.count; ++i) {
+    if (log.ops[i] == ptk_anm2_edit_view_detail_item_deselected) {
+      found_deselected = true;
+      TEST_CHECK(log.ids[i] == item2_id);
+    }
+  }
+  TEST_CHECK(found_deselected);
+  TEST_MSG("detail_item_deselected should be emitted when removing from multiselection");
+
+  // Verify detail_refresh was NOT emitted (differential update)
+  bool found_refresh = false;
+  for (size_t i = 0; i < log.count; ++i) {
+    if (log.ops[i] == ptk_anm2_edit_view_detail_refresh) {
+      found_refresh = true;
+    }
+  }
+  TEST_CHECK(!found_refresh);
+  TEST_MSG("detail_refresh should NOT be emitted when removing from multiselection");
+
+  ptk_anm2_edit_destroy(&edit);
+}
+
+// Test: mode switch (single to multi) emits detail_refresh
+static void test_detail_selection_mode_switch(void) {
+  struct ov_error err = {0};
+  struct ptk_anm2_edit *edit = NULL;
+  struct view_callback_log log = {0};
+
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
+
+  // Create structure with two value items
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
+  uint32_t item1_id = ptk_anm2_item_insert_value(doc, group_id, "Item1", "Value1", &err);
+  TEST_ASSERT_SUCCEEDED(item1_id != 0, &err);
+  uint32_t item2_id = ptk_anm2_item_insert_value(doc, group_id, "Item2", "Value2", &err);
+  TEST_ASSERT_SUCCEEDED(item2_id != 0, &err);
+
+  // Select item1 (single selection)
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, item1_id, false, false, false, &err), &err);
+
+  // Set up callback
+  ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
+
+  // ctrl+click item2 to switch to multiselection mode
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, item2_id, false, true, false, &err), &err);
+
+  // Verify detail_refresh was emitted (mode switch)
+  bool found_refresh = false;
+  for (size_t i = 0; i < log.count; ++i) {
+    if (log.ops[i] == ptk_anm2_edit_view_detail_refresh) {
+      found_refresh = true;
+    }
+  }
+  TEST_CHECK(found_refresh);
+  TEST_MSG("detail_refresh should be emitted when switching to multiselection mode");
+
+  // Verify item_selected was NOT emitted
+  bool found_selected = false;
+  for (size_t i = 0; i < log.count; ++i) {
+    if (log.ops[i] == ptk_anm2_edit_view_detail_item_selected) {
+      found_selected = true;
+    }
+  }
+  TEST_CHECK(!found_selected);
+  TEST_MSG("detail_item_selected should NOT be emitted on mode switch");
+
+  ptk_anm2_edit_destroy(&edit);
+}
+
 TEST_LIST = {
     {"edit_create_destroy", test_edit_create_destroy},
     {"selection_click", test_selection_click},
@@ -1783,5 +2211,15 @@ TEST_LIST = {
     {"swap_adjacent_items", test_swap_adjacent_items},
     {"add_item_and_undo", test_add_item_and_undo},
     {"would_move_items_selection_range", test_would_move_items_selection_range},
+    // Detail view differential update tests
+    {"detail_param_insert_when_selected", test_detail_param_insert_when_selected},
+    {"detail_param_insert_when_not_selected", test_detail_param_insert_when_not_selected},
+    {"detail_param_update_when_selected", test_detail_param_update_when_selected},
+    {"detail_param_remove_when_selected", test_detail_param_remove_when_selected},
+    {"detail_item_update_when_selected", test_detail_item_update_when_selected},
+    {"detail_item_update_when_not_selected", test_detail_item_update_when_not_selected},
+    {"detail_multisel_item_selected", test_detail_multisel_item_selected},
+    {"detail_multisel_item_deselected", test_detail_multisel_item_deselected},
+    {"detail_selection_mode_switch", test_detail_selection_mode_switch},
     {NULL, NULL},
 };

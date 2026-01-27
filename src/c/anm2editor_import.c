@@ -187,6 +187,9 @@ bool anm2editor_import_execute(void *const parent_window,
     goto cleanup;
   }
 
+  // Populate translated names for dialog display
+  ptk_alias_populate_translated_names(scripts);
+
   if (OV_ARRAY_LENGTH(scripts->items) == 0) {
     OV_ERROR_SET(err,
                  ov_error_type_generic,

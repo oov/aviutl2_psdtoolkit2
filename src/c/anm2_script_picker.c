@@ -227,7 +227,16 @@ static void init_listview(HWND const listview, struct ptk_script_picker_params *
   // Add items
   for (size_t i = 0; i < params->item_count; ++i) {
     wchar_t text[256];
-    ov_utf8_to_wchar(params->items[i].effect_name, strlen(params->items[i].effect_name), text, 256, NULL);
+
+    // Use translated name if available, otherwise convert effect_name from UTF-8
+    if (params->items[i].translated_name) {
+      size_t const len = wcslen(params->items[i].translated_name);
+      size_t const copy_len = len < 255 ? len : 255;
+      memcpy(text, params->items[i].translated_name, copy_len * sizeof(wchar_t));
+      text[copy_len] = L'\0';
+    } else {
+      ov_utf8_to_wchar(params->items[i].effect_name, strlen(params->items[i].effect_name), text, 256, NULL);
+    }
 
     LVITEMW item = {
         .mask = LVIF_TEXT,

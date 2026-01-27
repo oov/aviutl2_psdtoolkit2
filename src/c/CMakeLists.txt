@@ -192,6 +192,7 @@ add_library(psdtoolkit SHARED
   alias.c
   anm2.c
   anm2_edit.c
+  anm2_script_mapper.c
   anm2_selection.c
   anm2editor.c
   anm2editor_convert.c
@@ -208,6 +209,7 @@ add_library(psdtoolkit SHARED
   dialog.c
   dllmain.c
   error.c
+  i18n.c
   i18n.rc
   ini_reader.c
   input.c
@@ -265,7 +267,7 @@ target_link_libraries(test_ini_reader PRIVATE
 )
 add_test(NAME test_ini_reader COMMAND test_ini_reader)
 
-add_executable(test_layer layer_test.c ini_reader.c win32.c json.c)
+add_executable(test_layer layer_test.c ini_reader.c win32.c json.c i18n.c)
 target_link_libraries(test_layer PRIVATE
   psdtoolkit_intf
   ovbase
@@ -283,7 +285,7 @@ target_link_libraries(test_anm2 PRIVATE
 )
 add_test(NAME test_anm2 COMMAND test_anm2)
 
-add_executable(test_anm2_edit anm2_edit_test.c anm2_edit.c anm2_selection.c anm2.c json.c)
+add_executable(test_anm2_edit anm2_edit_test.c anm2_edit.c anm2_script_mapper.c anm2_selection.c anm2.c json.c ini_reader.c i18n.c)
 target_link_libraries(test_anm2_edit PRIVATE
   psdtoolkit_intf
   ovbase
@@ -301,7 +303,7 @@ target_link_libraries(test_anm2_selection PRIVATE
 )
 add_test(NAME test_anm2_selection COMMAND test_anm2_selection)
 
-add_executable(test_alias alias_test.c alias.c ini_reader.c)
+add_executable(test_alias alias_test.c alias.c ini_reader.c i18n.c)
 target_link_libraries(test_alias PRIVATE
   psdtoolkit_intf
   ovbase

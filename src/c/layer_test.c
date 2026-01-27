@@ -177,6 +177,9 @@ void ptk_anm2_edit_ptkl_targets_free(struct ptk_anm2_edit_ptkl_targets *targets)
       if (t->selector_name) {
         OV_ARRAY_DESTROY(&t->selector_name);
       }
+      if (t->display_name) {
+        OV_ARRAY_DESTROY(&t->display_name);
+      }
       if (t->effect_name) {
         OV_ARRAY_DESTROY(&t->effect_name);
       }
