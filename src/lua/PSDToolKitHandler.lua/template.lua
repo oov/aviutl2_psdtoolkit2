@@ -14,7 +14,7 @@ function M.load_template(template_name)
 		return nil
 	end
 
-	local template_path = plugin_dir .. "\\PSDToolKit\\template\\" .. template_name
+	local template_path = plugin_dir .. "\\..\\PSDToolKit\\template\\" .. template_name
 	local content = util.read_file(template_path)
 	if not content then
 		dbg("PSDToolKit: Template file not found: %s", template_path)

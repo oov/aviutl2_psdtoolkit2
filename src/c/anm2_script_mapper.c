@@ -44,7 +44,7 @@ static bool get_config_dir(NATIVE_CHAR **const dir, struct ov_error *const err) 
       goto cleanup;
     }
 
-    static wchar_t const suffix[] = L"\\PSDToolKit\\";
+    static wchar_t const suffix[] = L"\\";
     static size_t const suffix_len = (sizeof(suffix) / sizeof(wchar_t)) - 1;
 
     size_t const dir_len = (size_t)(last_slash - module_path);

@@ -1,6 +1,6 @@
 --@セリフ準備
 --information:セリフ準備@PSDToolKit %VERSION% by oov
---label:oov\PSDToolKit
+--label:PSDToolKit
 --value@id:キャラクターID,""
 --text@text:テキスト,こんにちは
 --file@audio:音声ファイル

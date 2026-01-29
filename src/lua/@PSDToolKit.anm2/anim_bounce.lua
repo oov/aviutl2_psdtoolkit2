@@ -1,6 +1,6 @@
 --@sub-ぼよん
 --information:sub-ぼよん@PSDToolKit %VERSION% by oov
---label:oov\PSDToolKit
+--label:PSDToolKit
 --value@id:キャラクターID,""
 --track@duration:長さ(秒),0,5,0.30,0.01
 --track@interval:間隔(秒),0,1,0.03,0.01

@@ -1,6 +1,6 @@
 --@パーツ上書き
 --info:パーツ上書き@PSDToolKit %VERSION% by oov
---label:oov\PSDToolKit
+--label:PSDToolKit
 --value@id:キャラクターID,""
 --track@p1:パーツ1,0,200,0,1
 --track@p2:パーツ2,0,200,0,1

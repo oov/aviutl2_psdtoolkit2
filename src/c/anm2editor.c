@@ -84,9 +84,9 @@ struct ptk_anm2editor {
   struct anm2editor_splitter *splitter;
 };
 
-// Get the Script directory path (DLL/../Script/)
+// Get the Script directory path (DLL/../../Script/)
 static bool get_script_dir(wchar_t **const dir, struct ov_error *const err) {
-  static wchar_t const suffix[] = L"\\..\\Script\\";
+  static wchar_t const suffix[] = L"\\..\\..\\Script\\";
   static size_t const suffix_len = (sizeof(suffix) / sizeof(wchar_t)) - 1;
 
   wchar_t *module_path = NULL;
@@ -114,7 +114,7 @@ static bool get_script_dir(wchar_t **const dir, struct ov_error *const err) {
     goto cleanup;
   }
 
-  // Build raw path: dir/../Script/
+  // Build raw path: dir/../../Script/
   dir_len = (size_t)(last_slash - module_path);
   raw_path_len = dir_len + suffix_len;
 

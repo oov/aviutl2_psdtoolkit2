@@ -228,11 +228,12 @@ add_library(psdtoolkit SHARED
 set_property(SOURCE psdtoolkit.rc APPEND PROPERTY OBJECT_DEPENDS
   ${CMAKE_CURRENT_SOURCE_DIR}/psdtoolkit.manifest
 )
+set(PTK_PLUGIN_DIR "${EXPORT_DIR}/Plugin/PSDToolKit")
 set_target_properties(psdtoolkit PROPERTIES
   OUTPUT_NAME "PSDToolKit.aux2"
   PREFIX ""
   SUFFIX ""
-  RUNTIME_OUTPUT_DIRECTORY "${EXPORT_DIR}/Plugin"
+  RUNTIME_OUTPUT_DIRECTORY "${PTK_PLUGIN_DIR}"
 )
 add_dependencies(psdtoolkit ${PROJECT_NAME}_generate_i18n_rc ${PROJECT_NAME}_generate_version_h)
 target_link_libraries(psdtoolkit PRIVATE
@@ -395,11 +396,11 @@ add_custom_target(${PROJECT_NAME}_generate_embed_lua_headers DEPENDS "${EMBED_LU
 add_dependencies(psdtoolkit ${PROJECT_NAME}_generate_embed_lua_headers)
 
 add_custom_command(TARGET psdtoolkit POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/README.md" "${EXPORT_DIR}/PSDToolKit.txt"
+  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/README.md" "${PTK_PLUGIN_DIR}/PSDToolKit.txt"
 )
 
 # Copy scripts to export directory
-# Default: copy to Script/oov with same filename
+# Default: copy to Script/PSDToolKit with same filename
 # Custom: "source_file|dest_subdir|dest_filename"
 set(COPY_SCRIPTS
   "${PSDToolKit.lua_LUA_OUTPUT}"
@@ -413,7 +414,7 @@ foreach(entry IN LISTS COPY_SCRIPTS)
     list(GET parts 1 dest_subdir)
     list(GET parts 2 dest_file)
   else()
-    set(dest_subdir "Script/oov")
+    set(dest_subdir "Script/PSDToolKit")
     get_filename_component(dest_file "${src_file}" NAME)
   endif()
   # If src_file is an absolute path or starts with ${, use it as-is.

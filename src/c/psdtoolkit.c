@@ -1040,7 +1040,7 @@ static bool initialize_ipc(HINSTANCE const hinst, struct psdtoolkit *const ptk, 
       OV_ARRAY_SET_LENGTH(exe_path, 0);
     }
 
-    static wchar_t const name[] = L"PSDToolKit\\PSDToolKit.exe";
+    static wchar_t const name[] = L"PSDToolKit.exe";
     static size_t const name_len = sizeof(name) / sizeof(name[0]) - 1;
     size_t const current_len = OV_ARRAY_LENGTH(exe_path);
     if (!OV_ARRAY_GROW(&exe_path, current_len + name_len + 1)) {

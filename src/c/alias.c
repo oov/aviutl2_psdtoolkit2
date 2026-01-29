@@ -68,8 +68,7 @@ void ptk_alias_script_definitions_free(struct ptk_alias_script_definitions *cons
 /**
  * @brief Get the base directory for PSDToolKit configuration files
  *
- * Returns the full path to the PSDToolKit config directory:
- * {DLL directory}/PSDToolKit/
+ * Returns the full path to the PSDToolKit config directory.
  *
  * @param dir [out] Output directory path (caller must free with OV_ARRAY_DESTROY)
  * @param err [out] Error information on failure
@@ -101,7 +100,7 @@ static bool get_config_dir(NATIVE_CHAR **const dir, struct ov_error *const err) 
       goto cleanup;
     }
 
-    static wchar_t const suffix[] = L"\\PSDToolKit\\";
+    static wchar_t const suffix[] = L"\\";
     static size_t const suffix_len = (sizeof(suffix) / sizeof(wchar_t)) - 1;
 
     size_t const dir_len = (size_t)(last_slash - module_path);

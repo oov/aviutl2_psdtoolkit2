@@ -69,23 +69,15 @@ chinesesimplified.AviUtl2NotFound=未找到 aviutl2.exe。请选择 aviutl2.exe�
 chinesesimplified.PortableInstallLocation=安装位置: %1
 
 [Files]
-Source: "@PTK_BUILD_OUTPUT_DIR@\Plugin\PSDToolKit.aux2"; DestDir: "{app}"; Flags: ignoreversion
 Source: "@PTK_BUILD_OUTPUT_DIR@\Plugin\PSDToolKit\*"; DestDir: "{app}\PSDToolKit"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "@PTK_BUILD_OUTPUT_DIR@\Script\oov\@PSDToolKit.anm2"; DestDir: "{app}\..\Script\oov"; Flags: ignoreversion
-Source: "@PTK_BUILD_OUTPUT_DIR@\Script\oov\@PSDToolKit.obj2"; DestDir: "{app}\..\Script\oov"; Flags: ignoreversion
-Source: "@PTK_BUILD_OUTPUT_DIR@\Script\oov\PSDToolKit.lua"; DestDir: "{app}\..\Script\oov"; Flags: ignoreversion
-Source: "@PTK_BUILD_OUTPUT_DIR@\Alias\字幕表示.object"; DestDir: "{app}\..\Alias"; Flags: ignoreversion
-Source: "@PTK_BUILD_OUTPUT_DIR@\Language\English.PSDToolKit.aul2"; DestDir: "{app}\..\Language"; Flags: ignoreversion
-Source: "@PTK_BUILD_OUTPUT_DIR@\Language\简体中文.PSDToolKit.aul2"; DestDir: "{app}\..\Language"; Flags: ignoreversion
-Source: "@PTK_BUILD_OUTPUT_DIR@\PSDToolKit.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "@PTK_BUILD_OUTPUT_DIR@\Script\PSDToolKit\*"; DestDir: "{app}\..\Script\PSDToolKit"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "@PTK_BUILD_OUTPUT_DIR@\Alias\*"; DestDir: "{app}\..\Alias"; Flags: ignoreversion
+Source: "@PTK_BUILD_OUTPUT_DIR@\Language\*.PSDToolKit.aul2"; DestDir: "{app}\..\Language"; Flags: ignoreversion
 
-; [InstallDelete]
-; Files or directories to remove during installation (e.g., when upgrading from older versions)
-; This section runs BEFORE files are installed, so it's safe to use for cleanup.
-; Examples:
-; Type: files; Name: "{app}\deprecated_file.lua"
-; Type: files; Name: "{app}\GCMZScript\old_script.lua"
-; Type: filesandordirs; Name: "{app}\OldFolder"
+[InstallDelete]
+; Remove old installation files (migration happens in CurStepChanged before this)
+Type: files; Name: "{app}\PSDToolKit.aux2"
+Type: files; Name: "{app}\PSDToolKit.txt"
 
 [Code]
 var
@@ -267,5 +259,69 @@ begin
       end;
       WizardForm.DirEdit.Text := PortableInstallDir;
     end;
+  end;
+end;
+
+procedure MigrateOldInstallation;
+var
+  OldScriptDir: String;
+  OldScriptFile1, OldScriptFile2, OldScriptFile3: String;
+  FindRec: TFindRec;
+begin
+  // Remove old script files from oov directory
+  OldScriptDir := ExpandConstant('{app}\..\Script\oov');
+  OldScriptFile1 := OldScriptDir + '\@PSDToolKit.anm2';
+  OldScriptFile2 := OldScriptDir + '\@PSDToolKit.obj2';
+  OldScriptFile3 := OldScriptDir + '\PSDToolKit.lua';
+
+  if FileExists(OldScriptFile1) then
+    DeleteFile(OldScriptFile1);
+  if FileExists(OldScriptFile2) then
+    DeleteFile(OldScriptFile2);
+  if FileExists(OldScriptFile3) then
+    DeleteFile(OldScriptFile3);
+
+  // Remove oov directory if empty
+  if DirExists(OldScriptDir) then
+  begin
+    if not FindFirst(OldScriptDir + '\*', FindRec) then
+    begin
+      // Directory is empty, remove it
+      RemoveDir(OldScriptDir);
+    end
+    else
+    begin
+      // Check if only . and .. entries exist
+      if (FindRec.Name = '.') or (FindRec.Name = '..') then
+      begin
+        if not FindNext(FindRec) then
+        begin
+          FindClose(FindRec);
+          RemoveDir(OldScriptDir);
+        end
+        else if ((FindRec.Name = '.') or (FindRec.Name = '..')) and not FindNext(FindRec) then
+        begin
+          FindClose(FindRec);
+          RemoveDir(OldScriptDir);
+        end
+        else
+        begin
+          FindClose(FindRec);
+        end;
+      end
+      else
+      begin
+        FindClose(FindRec);
+      end;
+    end;
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssInstall then
+  begin
+    // Perform migration before InstallDelete runs
+    MigrateOldInstallation;
   end;
 end;

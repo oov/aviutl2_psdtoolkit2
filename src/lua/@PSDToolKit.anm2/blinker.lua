@@ -1,6 +1,6 @@
 --@目パチ
 --information:目パチ@PSDToolKit %VERSION% by oov
---label:oov\PSDToolKit
+--label:PSDToolKit
 --value@anm1:開き~ptkl,""
 --value@anm2:ほぼ開き~ptkl,""
 --value@anm3:半開き~ptkl,""

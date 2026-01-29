@@ -1,6 +1,6 @@
 --@PSDファイル
 --information:PSDファイル@PSDToolKit %VERSION% by oov
---label:oov\PSDToolKit
+--label:PSDToolKit
 --file@psd:PSDファイル
 --check@safe_guard:セーフガード,true
 --value@tag:タグ,""

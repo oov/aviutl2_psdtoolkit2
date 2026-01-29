@@ -7,3 +7,4 @@ src/i18n/*.po
 src/i18n/*.mo
 src/i18n/.tool
 *.syso
+do.bash

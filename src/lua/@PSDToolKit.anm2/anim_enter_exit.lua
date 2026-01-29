@@ -1,6 +1,6 @@
 --@sub-ずいっ
 --information:sub-ずいっ@PSDToolKit %VERSION% by oov
---label:oov\PSDToolKit
+--label:PSDToolKit
 --value@id:キャラクターID,""
 --select@ein:登場=15,なし=0,Linear=1,SineIn=2,SineOut=3,SineInOut=4,QuadIn=5,QuadOut=6,QuadInOut=7,CubicIn=8,CubicOut=9,CubicInOut=10,QuartIn=11,QuartOut=12,QuartInOut=13,QuintIn=14,QuintOut=15,QuintInOut=16,ExpoIn=17,ExpoOut=18,ExpoInOut=19,BackIn=20,BackOut=21,BackInOut=22,ElasticIn=23,ElasticOut=24,ElasticInOut=25,BounceIn=26,BounceOut=27,BounceInOut=28
 --select@eout:退場=14,なし=0,Linear=1,SineIn=2,SineOut=3,SineInOut=4,QuadIn=5,QuadOut=6,QuadInOut=7,CubicIn=8,CubicOut=9,CubicInOut=10,QuartIn=11,QuartOut=12,QuartInOut=13,QuintIn=14,QuintOut=15,QuintInOut=16,ExpoIn=17,ExpoOut=18,ExpoInOut=19,BackIn=20,BackOut=21,BackInOut=22,ElasticIn=23,ElasticOut=24,ElasticInOut=25,BounceIn=26,BounceOut=27,BounceInOut=28

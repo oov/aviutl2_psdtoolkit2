@@ -115,7 +115,7 @@ static bool get_config_file_path(NATIVE_CHAR **const config_path, struct ov_erro
     return false;
   }
 
-  NATIVE_CHAR const last_part[] = NSTR("\\PSDToolKit\\PSDToolKit.json");
+  static NATIVE_CHAR const last_part[] = NSTR("\\PSDToolKit.json");
   NATIVE_CHAR *dll_dir = NULL;
   bool result = false;
 

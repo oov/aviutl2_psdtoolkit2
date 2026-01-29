@@ -245,13 +245,13 @@ BOOL __declspec(dllexport) InitializePlugin(DWORD version) {
   g_cache_index = 0;
 
   // Check minimum required AviUtl ExEdit2 version
-  if (version < 2002800) {
+  if (version < 2003001) {
     OV_ERROR_SETF(&err,
                   ov_error_type_generic,
                   ov_error_generic_fail,
                   "%1$s",
                   gettext("PSDToolKit requires AviUtl ExEdit2 %1$s or later."),
-                  "version2.0beta28");
+                  "version2.0beta30a");
     OV_ERROR_ADD_TRACE(&err);
     goto cleanup;
   }
@@ -453,7 +453,10 @@ static bool load_gcmzdrops(struct aviutl2_script_module_table *const script_modu
       OV_ARRAY_SET_LENGTH(path, 0);
     }
 
-    static wchar_t const name[] = L"GCMZDrops.aux2";
+    // Navigate to parent directory and then to GCMZDrops subdirectory
+    // Current: Plugin/PSDToolKit/
+    // Target:  Plugin/GCMZDrops/GCMZDrops.aux2
+    static wchar_t const name[] = L"..\\GCMZDrops\\GCMZDrops.aux2";
     size_t const name_len = sizeof(name) / sizeof(name[0]) - 1;
     size_t const current_len = OV_ARRAY_LENGTH(path);
     if (!OV_ARRAY_GROW(&path, current_len + name_len + 1)) {
@@ -476,12 +479,11 @@ static bool load_gcmzdrops(struct aviutl2_script_module_table *const script_modu
   }
 
   {
-    static uint32_t const target_version = 67108876;
-    static char const target_version_str[] = "v2.0.0alpha12";
+    static uint32_t const target_version = 67109035;
+    static char const target_version_str[] = "v2.0.0beta1";
 
     typedef uint32_t (*get_version_func)(void);
-    typedef bool (*register_script_module_func)(struct aviutl2_script_module_table *const table,
-                                                char const *const module_name);
+    typedef bool (*register_script_module_func)(struct aviutl2_script_module_table *const table);
     typedef bool (*add_handler_script_func)(char const *const script, size_t const script_len);
 
     get_version_func gcmz_get_version = (get_version_func)(void *)(GetProcAddress(g_gcmzdrops, "GetVersion"));
@@ -511,7 +513,7 @@ static bool load_gcmzdrops(struct aviutl2_script_module_table *const script_modu
       goto cleanup;
     }
 
-    if (!gcmz_register_script_module(script_module_table, "PSDToolKit")) {
+    if (!gcmz_register_script_module(script_module_table)) {
       OV_ERROR_SET_GENERIC(err, ov_error_generic_fail);
       goto cleanup;
     }
@@ -580,8 +582,14 @@ void __declspec(dllexport) RegisterPlugin(struct aviutl2_host_app_table *host) {
       {L"read_text_file", script_module_read_text_file},
       {NULL, NULL},
   };
+  static wchar_t script_module_information[64];
+  ov_snprintf_wchar(script_module_information,
+                    sizeof(script_module_information) / sizeof(script_module_information[0]),
+                    L"%1$hs",
+                    L"PSDToolKit %1$s by oov",
+                    PTK_VERSION);
   static struct aviutl2_script_module_table script_module_table = {
-      L"PSDToolKit",
+      script_module_information,
       script_module_functions,
   };
   host->register_script_module(&script_module_table);

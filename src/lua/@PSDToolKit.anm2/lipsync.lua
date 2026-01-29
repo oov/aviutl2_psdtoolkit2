@@ -1,6 +1,6 @@
 --@口パク 開閉のみ
 --information:口パク 開閉のみ@PSDToolKit %VERSION% by oov
---label:oov\PSDToolKit
+--label:PSDToolKit
 --value@anm1:開き~ptkl,""
 --value@anm2:ほぼ開き~ptkl,""
 --value@anm3:半開き~ptkl,""

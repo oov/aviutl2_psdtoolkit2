@@ -1,6 +1,6 @@
 --@口パク あいうえお
 --information:口パク あいうえお@PSDToolKit %VERSION% by oov
---label:oov\PSDToolKit
+--label:PSDToolKit
 --value@anm_a:あ~ptkl,""
 --value@anm_i:い~ptkl,""
 --value@anm_u:う~ptkl,""

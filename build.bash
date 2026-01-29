@@ -181,8 +181,8 @@ show_test_log() {
   fi
 }
 
-# Skip normal build process if only installer is requested
-if [ "${CREATE_INSTALLER}" -eq 0 ] || [ "${CREATE_ZIP}" -eq 1 ]; then
+# Skip normal build process if only zip or installer is requested
+if [ "${CREATE_INSTALLER}" -eq 0 ] && [ "${CREATE_ZIP}" -eq 0 ]; then
   for arch in $ARCHS; do
     builddir="${PWD}/build/${CMAKE_BUILD_TYPE}/${arch}"
     build_log="${builddir}/build.log"
@@ -234,20 +234,21 @@ if [ "${CREATE_ZIP}" -eq 1 ] || [ "${CREATE_INSTALLER}" -eq 1 ]; then
   fi
   source "${version_env}"
   echo "Version: ${PTK_VERSION}"
+
+  distdir="${PWD}/build/${CMAKE_BUILD_TYPE}/dist"
+  if [ "${REBUILD}" -eq 1 ]; then
+    rm -rf "${distdir}"
+  fi
+  mkdir -p "${distdir}"
 fi
 
 if [ "${CREATE_ZIP}" -eq 1 ]; then
-  distdir="${PWD}/build/${CMAKE_BUILD_TYPE}/dist"
-  rm -rf "${distdir}"
-  mkdir -p "${distdir}"
   builddir="${PWD}/build/${CMAKE_BUILD_TYPE}/x86_64"
-  zipname="psdtoolkit_${PTK_VERSION}.zip"
+  zipname="psdtoolkit_${PTK_VERSION}.au2pkg.zip"
   (cd "${builddir}/bin" && cmake -E tar cf "${distdir}/${zipname}" --format=zip .)
 fi
 
 if [ "${CREATE_INSTALLER}" -eq 1 ]; then
-  distdir="${PWD}/build/${CMAKE_BUILD_TYPE}/dist"
-  mkdir -p "${distdir}"
   builddir="${PWD}/build/${CMAKE_BUILD_TYPE}/x86_64"
   installer_iss="${builddir}/installer.iss"
 
