@@ -537,3 +537,56 @@ cleanup:
     OV_ARRAY_DESTROY(&error_msg);
   }
 }
+
+// Encoding detection result values (matches values documented in header)
+enum {
+  encoding_unknown = 0,
+  encoding_utf8 = 1,
+  encoding_utf16le = 2,
+  encoding_utf16be = 3,
+};
+
+void ptk_script_module_detect_encoding(struct ptk_script_module *const sm,
+                                       struct aviutl2_script_module_param *const param) {
+  (void)sm;
+
+  char const *const text = param->get_param_string(0);
+  if (!text) {
+    param->push_result_int(encoding_unknown);
+    return;
+  }
+
+  size_t const len = strlen(text);
+
+  // Check for BOM
+  if (len >= 3) {
+    unsigned char const *const u = (unsigned char const *)text;
+    // UTF-8 BOM: EF BB BF
+    if (u[0] == 0xEF && u[1] == 0xBB && u[2] == 0xBF) {
+      param->push_result_int(encoding_utf8);
+      return;
+    }
+  }
+  if (len >= 2) {
+    unsigned char const *const u = (unsigned char const *)text;
+    // UTF-16LE BOM: FF FE
+    if (u[0] == 0xFF && u[1] == 0xFE) {
+      param->push_result_int(encoding_utf16le);
+      return;
+    }
+    // UTF-16BE BOM: FE FF
+    if (u[0] == 0xFE && u[1] == 0xFF) {
+      param->push_result_int(encoding_utf16be);
+      return;
+    }
+  }
+
+  // No BOM found, validate as UTF-8
+  // ov_utf8_to_wchar_len returns 0 on failure (invalid UTF-8)
+  if (len == 0 || ov_utf8_to_wchar_len(text, len) > 0) {
+    param->push_result_int(encoding_utf8);
+    return;
+  }
+
+  param->push_result_int(encoding_unknown);
+}

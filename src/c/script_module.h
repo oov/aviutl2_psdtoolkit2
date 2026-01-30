@@ -248,3 +248,22 @@ void ptk_script_module_get_preferred_languages(struct ptk_script_module *sm, str
  * @param param Script module parameter interface
  */
 void ptk_script_module_read_text_file(struct ptk_script_module *sm, struct aviutl2_script_module_param *param);
+
+/**
+ * @brief Script function: Detect text encoding
+ *
+ * Detects the encoding of a text string by checking for BOM or validating UTF-8 sequences.
+ *
+ * Parameters from script:
+ *   [0] string: text - Text content to analyze
+ *
+ * Pushes an integer result:
+ *   - 0: Unknown encoding (not valid UTF-8, no BOM)
+ *   - 1: UTF-8 (with BOM, or without BOM but valid UTF-8 sequence)
+ *   - 2: UTF-16LE (BOM FF FE detected)
+ *   - 3: UTF-16BE (BOM FE FF detected)
+ *
+ * @param sm Script module instance
+ * @param param Script module parameter interface
+ */
+void ptk_script_module_detect_encoding(struct ptk_script_module *sm, struct aviutl2_script_module_param *param);

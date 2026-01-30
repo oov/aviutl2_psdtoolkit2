@@ -428,6 +428,10 @@ static void script_module_read_text_file(struct aviutl2_script_module_param *par
   ptk_script_module_read_text_file(g_script_module, param);
 }
 
+static void script_module_detect_encoding(struct aviutl2_script_module_param *param) {
+  ptk_script_module_detect_encoding(g_script_module, param);
+}
+
 static bool load_gcmzdrops(struct aviutl2_script_module_table *const script_module_table, struct ov_error *const err) {
   wchar_t *path = NULL;
   void *dll_hinst = NULL;
@@ -580,6 +584,7 @@ void __declspec(dllexport) RegisterPlugin(struct aviutl2_host_app_table *host) {
       {L"set_props", script_module_set_props},
       {L"draw", script_module_draw},
       {L"read_text_file", script_module_read_text_file},
+      {L"detect_encoding", script_module_detect_encoding},
       {NULL, NULL},
   };
   static wchar_t script_module_information[64];

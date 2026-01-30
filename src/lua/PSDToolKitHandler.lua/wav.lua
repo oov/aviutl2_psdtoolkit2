@@ -47,7 +47,7 @@ function M.get_audio_text_from_single_wav(files)
 		return nil, nil
 	end
 	local txt_path = util.get_basename_without_ext(file.filepath) .. ".txt"
-	local txt_content = util.read_file(txt_path)
+	local txt_content = util.read_text_file_utf8(txt_path)
 	if not txt_content then
 		txt_content = ""
 	else
@@ -87,8 +87,8 @@ function M.get_audio_text_from_wav_txt_pair(files)
 		return nil, nil
 	end
 
-	-- Read text content from file
-	local txt_content = util.read_file(txt_file.filepath)
+	-- Read text content from file with auto encoding detection
+	local txt_content = util.read_text_file_utf8(txt_file.filepath)
 	if not txt_content then
 		return nil, nil
 	end

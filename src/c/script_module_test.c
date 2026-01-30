@@ -762,6 +762,74 @@ static void test_script_module_get_preferred_languages(void) {
   g_ctx = NULL;
 }
 
+static void test_script_module_detect_encoding(void) {
+  struct mock_context ctx = {0};
+  g_ctx = &ctx;
+
+  struct ov_error err = {0};
+  struct ptk_script_module_callbacks callbacks = {0};
+  struct ptk_script_module *sm = ptk_script_module_create(&callbacks, &err);
+  if (!TEST_SUCCEEDED(sm != NULL, &err)) {
+    return;
+  }
+
+  struct aviutl2_script_module_param param = {
+      .push_result_int = mock_push_result_int,
+      .get_param_string = mock_get_param_string,
+  };
+
+  // Test: UTF-8 BOM
+  ctx.param_strings[0] = "\xEF\xBB\xBFHello";
+  ctx.pushed_int = -1;
+  ptk_script_module_detect_encoding(sm, &param);
+  TEST_CHECK(ctx.pushed_int == 1); // UTF-8
+
+  // Test: UTF-16LE BOM
+  ctx.param_strings[0] = "\xFF\xFEHello";
+  ctx.pushed_int = -1;
+  ptk_script_module_detect_encoding(sm, &param);
+  TEST_CHECK(ctx.pushed_int == 2); // UTF-16LE
+
+  // Test: UTF-16BE BOM
+  ctx.param_strings[0] = "\xFE\xFFHello";
+  ctx.pushed_int = -1;
+  ptk_script_module_detect_encoding(sm, &param);
+  TEST_CHECK(ctx.pushed_int == 3); // UTF-16BE
+
+  // Test: Valid UTF-8 without BOM (ASCII)
+  ctx.param_strings[0] = "Hello World";
+  ctx.pushed_int = -1;
+  ptk_script_module_detect_encoding(sm, &param);
+  TEST_CHECK(ctx.pushed_int == 1); // UTF-8
+
+  // Test: Valid UTF-8 without BOM (Japanese)
+  ctx.param_strings[0] = "こんにちは";
+  ctx.pushed_int = -1;
+  ptk_script_module_detect_encoding(sm, &param);
+  TEST_CHECK(ctx.pushed_int == 1); // UTF-8
+
+  // Test: Invalid UTF-8 (Shift_JIS "あ" = 0x82 0xA0)
+  ctx.param_strings[0] = "\x82\xA0";
+  ctx.pushed_int = -1;
+  ptk_script_module_detect_encoding(sm, &param);
+  TEST_CHECK(ctx.pushed_int == 0); // Unknown
+
+  // Test: Empty string
+  ctx.param_strings[0] = "";
+  ctx.pushed_int = -1;
+  ptk_script_module_detect_encoding(sm, &param);
+  TEST_CHECK(ctx.pushed_int == 1); // Empty is valid UTF-8
+
+  // Test: NULL string
+  ctx.param_strings[0] = NULL;
+  ctx.pushed_int = -1;
+  ptk_script_module_detect_encoding(sm, &param);
+  TEST_CHECK(ctx.pushed_int == 0); // Unknown
+
+  ptk_script_module_destroy(&sm);
+  g_ctx = NULL;
+}
+
 TEST_LIST = {
     {"test_script_module_get_render_config", test_script_module_get_render_config},
     {"test_script_module_generate_tag", test_script_module_generate_tag},
@@ -771,5 +839,6 @@ TEST_LIST = {
     {"test_script_module_draw", test_script_module_draw},
     {"test_script_module_read_text_file", test_script_module_read_text_file},
     {"test_script_module_get_preferred_languages", test_script_module_get_preferred_languages},
+    {"test_script_module_detect_encoding", test_script_module_detect_encoding},
     {NULL, NULL},
 };
