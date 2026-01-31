@@ -51,8 +51,8 @@ static void test_selection_set_focus_selector(void) {
   sel = anm2_selection_create(doc, &err);
   TEST_ASSERT_SUCCEEDED(sel != NULL, &err);
 
-  uint32_t id_a = ptk_anm2_selector_insert(doc, 0, "A", &err);
-  uint32_t id_b = ptk_anm2_selector_insert(doc, 0, "B", &err);
+  uint32_t id_a = ptk_anm2_selector_insert(doc, 0, "A", 0, &err);
+  uint32_t id_b = ptk_anm2_selector_insert(doc, 0, "B", 0, &err);
   TEST_ASSERT_SUCCEEDED(id_a != 0, &err);
   TEST_ASSERT_SUCCEEDED(id_b != 0, &err);
 
@@ -84,7 +84,7 @@ static void test_selection_set_focus_item_update_anchor(void) {
   sel = anm2_selection_create(doc, &err);
   TEST_ASSERT_SUCCEEDED(sel != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   uint32_t id_a = ptk_anm2_item_insert_value(doc, sel_id, "A", "a", &err);
   uint32_t id_b = ptk_anm2_item_insert_value(doc, sel_id, "B", "b", &err);
@@ -127,7 +127,7 @@ static void test_selection_apply_treeview_selection_basic(void) {
   sel = anm2_selection_create(doc, &err);
   TEST_ASSERT_SUCCEEDED(sel != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   uint32_t id_a = ptk_anm2_item_insert_value(doc, sel_id, "A", "a", &err);
   uint32_t id_b = ptk_anm2_item_insert_value(doc, sel_id, "B", "b", &err);
@@ -194,7 +194,7 @@ static void test_selection_apply_treeview_selector(void) {
   sel = anm2_selection_create(doc, &err);
   TEST_ASSERT_SUCCEEDED(sel != NULL, &err);
 
-  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   uint32_t id_a = ptk_anm2_item_insert_value(doc, group_id, "A", "a", &err);
   uint32_t id_b = ptk_anm2_item_insert_value(doc, group_id, "B", "b", &err);
@@ -240,9 +240,9 @@ static void test_selection_apply_range_across_selectors(void) {
   sel = anm2_selection_create(doc, &err);
   TEST_ASSERT_SUCCEEDED(sel != NULL, &err);
 
-  sel_a = ptk_anm2_selector_insert(doc, 0, "A", &err);
+  sel_a = ptk_anm2_selector_insert(doc, 0, "A", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_a != 0, &err);
-  sel_b = ptk_anm2_selector_insert(doc, 0, "B", &err);
+  sel_b = ptk_anm2_selector_insert(doc, 0, "B", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_b != 0, &err);
   uint32_t id_a1 = ptk_anm2_item_insert_value(doc, sel_a, "A1", "a1", &err);
   uint32_t id_a2 = ptk_anm2_item_insert_value(doc, sel_a, "A2", "a2", &err);
@@ -278,7 +278,7 @@ static void test_selection_replace_selected_items(void) {
   sel = anm2_selection_create(doc, &err);
   TEST_ASSERT_SUCCEEDED(sel != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   uint32_t id_a = ptk_anm2_item_insert_value(doc, sel_id, "A", "a", &err);
   uint32_t id_b = ptk_anm2_item_insert_value(doc, sel_id, "B", "b", &err);
@@ -314,7 +314,7 @@ static void test_selection_refresh_invalid_anchor(void) {
   sel = anm2_selection_create(doc, &err);
   TEST_ASSERT_SUCCEEDED(sel != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   uint32_t id_a = ptk_anm2_item_insert_value(doc, sel_id, "A", "a", &err);
   uint32_t id_b = ptk_anm2_item_insert_value(doc, sel_id, "B", "b", &err);
@@ -353,7 +353,7 @@ static void test_selection_refresh_focus_removed(void) {
   sel = anm2_selection_create(doc, &err);
   TEST_ASSERT_SUCCEEDED(sel != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   uint32_t id_a = ptk_anm2_item_insert_value(doc, sel_id, "A", "a", &err);
   TEST_ASSERT_SUCCEEDED(id_a != 0, &err);
@@ -384,7 +384,7 @@ static void test_selection_refresh_selector_focus_removed(void) {
   sel = anm2_selection_create(doc, &err);
   TEST_ASSERT_SUCCEEDED(sel != NULL, &err);
 
-  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
 
   TEST_ASSERT_SUCCEEDED(anm2_selection_set_focus_selector(sel, group_id, &err), &err);
@@ -417,7 +417,7 @@ static void test_selection_multisel_partial_remove(void) {
   sel = anm2_selection_create(doc, &err);
   TEST_ASSERT_SUCCEEDED(sel != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   uint32_t id_a = ptk_anm2_item_insert_value(doc, sel_id, "A", "a", &err);
   uint32_t id_b = ptk_anm2_item_insert_value(doc, sel_id, "B", "b", &err);

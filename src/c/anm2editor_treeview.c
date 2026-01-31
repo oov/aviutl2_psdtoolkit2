@@ -19,6 +19,11 @@ enum {
   CMD_ADD_SELECTOR = 4,
 };
 
+// Selector userdata encoding:
+// - bit 0 = expanded state (1=expanded, 0=collapsed)
+static inline bool selector_userdata_is_expanded(uintptr_t userdata) { return (userdata & 1) != 0; }
+static inline uintptr_t selector_userdata_encode_expanded(bool expanded) { return expanded ? 1 : 0; }
+
 #define TREEVIEW_SUBCLASS_ID 1
 
 struct anm2editor_treeview {
@@ -107,6 +112,59 @@ static HTREEITEM find_treeview_item_by_lparam(HWND treeview, LPARAM target_lpara
     hRoot = (HTREEITEM)(SendMessageW(treeview, TVM_GETNEXTITEM, TVGN_NEXT, (LPARAM)hRoot));
   }
   return NULL;
+}
+
+// Sync TreeView expand state with userdata for a specific selector
+static void sync_selector_expand_state(struct anm2editor_treeview *tv, uint32_t selector_id) {
+  if (!tv || !tv->window || !tv->edit || selector_id == 0) {
+    return;
+  }
+  LPARAM const sel_lparam = treeview_encode_selector_id(selector_id);
+  HTREEITEM hSelector = find_treeview_item_by_lparam(tv->window, sel_lparam);
+  if (!hSelector) {
+    return;
+  }
+  uintptr_t const userdata = ptk_anm2_edit_selector_get_userdata(tv->edit, selector_id);
+  bool const should_expand = selector_userdata_is_expanded(userdata);
+  UINT const state = (UINT)SendMessageW(tv->window, TVM_GETITEMSTATE, (WPARAM)hSelector, (LPARAM)TVIS_EXPANDED);
+  bool const is_expanded = (state & TVIS_EXPANDED) != 0;
+  if (should_expand != is_expanded) {
+    TreeView_Expand(tv->window, hSelector, should_expand ? TVE_EXPAND : TVE_COLLAPSE);
+  }
+}
+
+// Caret state for save/restore operations
+struct treeview_caret_state {
+  LPARAM lparam; // 0 = no caret saved
+};
+
+// Save the current caret position (item with focus rectangle)
+static struct treeview_caret_state treeview_save_caret(struct anm2editor_treeview *tv) {
+  struct treeview_caret_state state = {0};
+  if (!tv || !tv->window) {
+    return state;
+  }
+  HTREEITEM const hCaret = (HTREEITEM)(uintptr_t)SendMessageW(tv->window, TVM_GETNEXTITEM, TVGN_CARET, 0);
+  if (hCaret) {
+    TVITEMW tvi = {.mask = TVIF_PARAM, .hItem = hCaret};
+    if (SendMessageW(tv->window, TVM_GETITEMW, 0, (LPARAM)&tvi)) {
+      state.lparam = tvi.lParam;
+    }
+  }
+  return state;
+}
+
+// Restore caret position, suppressing selection change notifications
+static void treeview_restore_caret(struct anm2editor_treeview *tv, struct treeview_caret_state const *state) {
+  if (!tv || !tv->window || !state || state->lparam == 0) {
+    return;
+  }
+  HTREEITEM hItem = find_treeview_item_by_lparam(tv->window, state->lparam);
+  if (hItem) {
+    tv->suppress_selection_changed = true;
+    TreeView_SelectItem(tv->window, hItem);
+    tv->suppress_selection_changed = false;
+  }
 }
 
 // Get lParam from TreeView item, fetching it if not provided in notification
@@ -690,144 +748,15 @@ void anm2editor_treeview_rebuild(struct anm2editor_treeview *tv) {
                               });
     }
 
-    // Default: expand all selectors
-    TreeView_Expand(tv->window, hSelector, TVE_EXPAND);
-  }
-
-  SendMessageW(tv->window, WM_SETREDRAW, TRUE, 0);
-  InvalidateRect(tv->window, NULL, TRUE);
-}
-
-bool anm2editor_treeview_refresh(struct anm2editor_treeview *tv, struct ov_error *err) {
-  (void)err;
-  if (!tv || !tv->window || !tv->edit) {
-    return true;
-  }
-
-  size_t const selector_count = ptk_anm2_edit_selector_count(tv->edit);
-
-  HTREEITEM selected_item = NULL;
-  LPARAM selected_lparam = 0;
-
-  // Save scroll position
-  int const scroll_pos = GetScrollPos(tv->window, SB_VERT);
-
-  // Save expanded state of each selector into userdata
-  for (HTREEITEM hItem = (HTREEITEM)(SendMessageW(tv->window, TVM_GETNEXTITEM, TVGN_ROOT, 0)); hItem;
-       hItem = (HTREEITEM)(SendMessageW(tv->window, TVM_GETNEXTITEM, TVGN_NEXT, (LPARAM)hItem))) {
-    TVITEMW tvi = {.mask = TVIF_STATE | TVIF_PARAM, .hItem = hItem, .stateMask = TVIS_EXPANDED};
-    if (SendMessageW(tv->window, TVM_GETITEMW, 0, (LPARAM)&tvi)) {
-      uint32_t id = 0;
-      if (treeview_decode_lparam(tvi.lParam, &id)) {
-        // It's a selector - save expanded state to userdata
-        uintptr_t userdata = 2; // Set bit 1 to indicate state has been set
-        if (tvi.state & TVIS_EXPANDED) {
-          userdata |= 1; // Set expanded bit
-        }
-        ptk_anm2_edit_selector_set_userdata(tv->edit, id, userdata);
-      }
-    }
-  }
-
-  // Save selected item's lParam (ID-based, so it survives rebuild)
-  {
-    HTREEITEM hSel = (HTREEITEM)(SendMessageW(tv->window, TVM_GETNEXTITEM, TVGN_CARET, 0));
-    if (hSel) {
-      TVITEMW tvi = {.mask = TVIF_PARAM, .hItem = hSel};
-      if (SendMessageW(tv->window, TVM_GETITEMW, 0, (LPARAM)&tvi)) {
-        selected_lparam = tvi.lParam;
-      }
-    }
-  }
-
-  // Rebuild tree
-  SendMessageW(tv->window, WM_SETREDRAW, FALSE, 0);
-  TreeView_DeleteAllItems(tv->window);
-
-  for (size_t i = 0; i < selector_count; i++) {
-    uint32_t const sel_id = ptk_anm2_edit_selector_get_id(tv->edit, i);
-
-    wchar_t group_name[256] = {0};
-    ptk_anm2_edit_format_selector_display_name(
-        tv->edit, sel_id, group_name, sizeof(group_name) / sizeof(group_name[0]));
-
-    LPARAM const sel_lparam = treeview_encode_selector_id(sel_id);
-
-    HTREEITEM hSelector = (HTREEITEM)(SendMessageW(
-        tv->window,
-        TVM_INSERTITEMW,
-        0,
-        (LPARAM) & (TVINSERTSTRUCTW){
-                       .hParent = TVI_ROOT,
-                       .hInsertAfter = TVI_LAST,
-                       .item =
-                           {
-                               .mask = TVIF_TEXT | TVIF_PARAM | TVIF_IMAGE | TVIF_SELECTEDIMAGE,
-                               .pszText = group_name,
-                               .iImage = 0,
-                               .iSelectedImage = 0,
-                               .lParam = sel_lparam,
-                           },
-                   }));
-
-    if (selected_lparam == sel_lparam) {
-      selected_item = hSelector;
-    }
-
-    size_t const item_count = ptk_anm2_edit_item_count(tv->edit, sel_id);
-
-    for (size_t j = 0; j < item_count; j++) {
-      uint32_t const item_id = ptk_anm2_edit_item_get_id(tv->edit, i, j);
-
-      wchar_t item_name[256] = {0};
-      ptk_anm2_edit_format_item_display_name(tv->edit, item_id, item_name, sizeof(item_name) / sizeof(item_name[0]));
-
-      LPARAM const item_lparam = treeview_encode_item_id(item_id);
-
-      HTREEITEM hItem = (HTREEITEM)(SendMessageW(
-          tv->window,
-          TVM_INSERTITEMW,
-          0,
-          (LPARAM) & (TVINSERTSTRUCTW){
-                         .hParent = hSelector,
-                         .hInsertAfter = TVI_LAST,
-                         .item =
-                             {
-                                 .mask = TVIF_TEXT | TVIF_PARAM | TVIF_IMAGE | TVIF_SELECTEDIMAGE,
-                                 .pszText = item_name,
-                                 .iImage = 1,
-                                 .iSelectedImage = 1,
-                                 .lParam = item_lparam,
-                             },
-                     }));
-      if (selected_lparam == item_lparam) {
-        selected_item = hItem;
-      }
-    }
-
-    // Restore expanded state from userdata (default: expanded for new selectors)
+    // Expand only if userdata indicates expanded state
     uintptr_t const userdata = ptk_anm2_edit_selector_get_userdata(tv->edit, sel_id);
-    // If bit 1 is not set (state not saved yet), default to expanded
-    // Otherwise, check bit 0 for expanded state
-    bool const state_saved = (userdata & 2) != 0;
-    bool const should_expand = !state_saved || (userdata & 1);
-    if (should_expand) {
+    if (selector_userdata_is_expanded(userdata)) {
       TreeView_Expand(tv->window, hSelector, TVE_EXPAND);
     }
   }
 
-  // Restore selection
-  if (selected_item) {
-    SendMessageW(tv->window, TVM_SELECTITEM, TVGN_CARET, (LPARAM)selected_item);
-  }
-
   SendMessageW(tv->window, WM_SETREDRAW, TRUE, 0);
-
-  // Restore scroll position
-  SetScrollPos(tv->window, SB_VERT, scroll_pos, FALSE);
-  SendMessageW(tv->window, WM_VSCROLL, MAKEWPARAM(SB_THUMBPOSITION, scroll_pos), 0);
-
-  return true;
+  InvalidateRect(tv->window, NULL, TRUE);
 }
 
 void anm2editor_treeview_update_differential(struct anm2editor_treeview *tv,
@@ -844,9 +773,12 @@ void anm2editor_treeview_update_differential(struct anm2editor_treeview *tv,
     anm2editor_treeview_rebuild(tv);
     break;
 
-  case anm2editor_treeview_op_selector_insert:
-    treeview_insert_selector_by_id(tv, id, before_id, true);
-    break;
+  case anm2editor_treeview_op_selector_insert: {
+    uintptr_t const userdata = ptk_anm2_edit_selector_get_userdata(tv->edit, id);
+    bool const expand = selector_userdata_is_expanded(userdata);
+    treeview_insert_selector_by_id(tv, id, before_id, expand);
+    sync_selector_expand_state(tv, id);
+  } break;
 
   case anm2editor_treeview_op_selector_remove: {
     LPARAM const sel_lparam = treeview_encode_selector_id(id);
@@ -871,20 +803,19 @@ void anm2editor_treeview_update_differential(struct anm2editor_treeview *tv,
     LPARAM const sel_lparam = treeview_encode_selector_id(id);
     HTREEITEM hOldSelector = find_treeview_item_by_lparam(tv->window, sel_lparam);
     if (hOldSelector) {
+      struct treeview_caret_state const caret_state = treeview_save_caret(tv);
+
       if (tv->transaction_depth == 0) {
         SendMessageW(tv->window, WM_SETREDRAW, FALSE, 0);
       }
 
-      UINT const old_state =
-          (UINT)SendMessageW(tv->window, TVM_GETITEMSTATE, (WPARAM)hOldSelector, (LPARAM)TVIS_EXPANDED);
-      bool const was_expanded = (old_state & TVIS_EXPANDED) != 0;
+      uintptr_t const userdata = ptk_anm2_edit_selector_get_userdata(tv->edit, id);
+      bool const expand = selector_userdata_is_expanded(userdata);
 
       TreeView_DeleteItem(tv->window, hOldSelector);
-      HTREEITEM hNewSelector = treeview_insert_selector_by_id(tv, id, before_id, was_expanded);
-
-      if (hNewSelector && tv->transaction_depth == 0) {
-        TreeView_SelectItem(tv->window, hNewSelector);
-      }
+      treeview_insert_selector_by_id(tv, id, before_id, expand);
+      treeview_restore_caret(tv, &caret_state);
+      sync_selector_expand_state(tv, id);
 
       if (tv->transaction_depth == 0) {
         SendMessageW(tv->window, WM_SETREDRAW, TRUE, 0);
@@ -895,6 +826,7 @@ void anm2editor_treeview_update_differential(struct anm2editor_treeview *tv,
 
   case anm2editor_treeview_op_item_insert:
     treeview_insert_item_by_id(tv, parent_id, id, before_id);
+    sync_selector_expand_state(tv, parent_id);
     break;
 
   case anm2editor_treeview_op_item_remove: {
@@ -917,28 +849,16 @@ void anm2editor_treeview_update_differential(struct anm2editor_treeview *tv,
     LPARAM const item_lparam = treeview_encode_item_id(id);
     HTREEITEM hOldItem = find_treeview_item_by_lparam(tv->window, item_lparam);
     if (hOldItem) {
+      struct treeview_caret_state const caret_state = treeview_save_caret(tv);
+
       if (tv->transaction_depth == 0) {
         SendMessageW(tv->window, WM_SETREDRAW, FALSE, 0);
       }
 
-      LPARAM const sel_lparam = treeview_encode_selector_id(parent_id);
-      HTREEITEM hDstSelector = find_treeview_item_by_lparam(tv->window, sel_lparam);
-      bool dst_was_expanded = false;
-      if (hDstSelector) {
-        UINT const dst_state =
-            (UINT)SendMessageW(tv->window, TVM_GETITEMSTATE, (WPARAM)hDstSelector, (LPARAM)TVIS_EXPANDED);
-        dst_was_expanded = (dst_state & TVIS_EXPANDED) != 0;
-      }
-
       TreeView_DeleteItem(tv->window, hOldItem);
-      HTREEITEM hNewItem = treeview_insert_item_by_id(tv, parent_id, id, before_id);
-
-      if (hNewItem && tv->transaction_depth == 0) {
-        TreeView_SelectItem(tv->window, hNewItem);
-        if (hDstSelector && !dst_was_expanded) {
-          TreeView_Expand(tv->window, hDstSelector, TVE_COLLAPSE);
-        }
-      }
+      treeview_insert_item_by_id(tv, parent_id, id, before_id);
+      treeview_restore_caret(tv, &caret_state);
+      sync_selector_expand_state(tv, parent_id);
 
       if (tv->transaction_depth == 0) {
         SendMessageW(tv->window, WM_SETREDRAW, TRUE, 0);
@@ -1110,8 +1030,10 @@ intptr_t anm2editor_treeview_handle_notify(struct anm2editor_treeview *tv, void 
       is_selector = treeview_decode_lparam(nmtv->itemNew.lParam, &id);
     }
 
-    // For keyboard navigation (action != TVC_BYMOUSE), update selection here
-    if (nmtv->action != TVC_BYMOUSE && tv->edit) {
+    // For keyboard navigation, update selection here
+    // TVC_BYMOUSE is handled in WM_LBUTTONDOWN subclass
+    // TVC_UNKNOWN (programmatic changes) should not modify selection
+    if (nmtv->action == TVC_BYKEYBOARD && tv->edit) {
       bool const ctrl_pressed = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
       bool const shift_pressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
 
@@ -1129,6 +1051,19 @@ intptr_t anm2editor_treeview_handle_notify(struct anm2editor_treeview *tv, void 
     if (tv->callbacks.on_selection_changed) {
       tv->callbacks.on_selection_changed(
           tv->callbacks.userdata, nmtv->itemNew.hItem ? &info : NULL, ctrl_pressed, shift_pressed);
+    }
+    return 0;
+  }
+
+  case TVN_ITEMEXPANDEDW: {
+    NMTREEVIEWW const *nmtv = (NMTREEVIEWW const *)nmhdr_ptr;
+    if (nmtv->itemNew.hItem && tv->edit) {
+      uint32_t id = 0;
+      if (treeview_decode_lparam(nmtv->itemNew.lParam, &id)) {
+        // It's a selector - save expanded state to userdata
+        bool const is_expanded = (nmtv->action == TVE_EXPAND);
+        ptk_anm2_edit_selector_set_userdata(tv->edit, id, selector_userdata_encode_expanded(is_expanded));
+      }
     }
     return 0;
   }

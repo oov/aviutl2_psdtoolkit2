@@ -106,11 +106,15 @@ bool ptk_anm2_set_psd_path(struct ptk_anm2 *doc, char const *path, struct ov_err
   return false;
 }
 
-uint32_t
-ptk_anm2_selector_insert(struct ptk_anm2 *doc, uint32_t before_id, char const *group, struct ov_error *const err) {
+uint32_t ptk_anm2_selector_insert(struct ptk_anm2 *doc,
+                                  uint32_t before_id,
+                                  char const *group,
+                                  uintptr_t initial_userdata,
+                                  struct ov_error *const err) {
   (void)doc;
   (void)before_id;
   (void)group;
+  (void)initial_userdata;
   (void)err;
   return 0;
 }

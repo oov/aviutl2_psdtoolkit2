@@ -50,7 +50,7 @@ static void test_selection_click(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   id_a = ptk_anm2_item_insert_value(doc, sel_id, "A", "a", &err);
   id_b = ptk_anm2_item_insert_value(doc, sel_id, "B", "b", &err);
@@ -92,7 +92,7 @@ static void test_selection_ctrl_toggle(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   id_a = ptk_anm2_item_insert_value(doc, sel_id, "A", "a", &err);
   id_b = ptk_anm2_item_insert_value(doc, sel_id, "B", "b", &err);
@@ -139,7 +139,7 @@ static void test_selection_shift_range(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   id_a = ptk_anm2_item_insert_value(doc, sel_id, "A", "a", &err);
   id_b = ptk_anm2_item_insert_value(doc, sel_id, "B", "b", &err);
@@ -180,7 +180,7 @@ static void test_selection_ctrl_selector(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   id_a = ptk_anm2_item_insert_value(doc, group_id, "A", "a", &err);
   id_b = ptk_anm2_item_insert_value(doc, group_id, "B", "b", &err);
@@ -253,7 +253,7 @@ static void test_edit_item_rename_value(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   id_a = ptk_anm2_item_insert_value(doc, sel_id, "A", "a", &err);
   TEST_ASSERT_SUCCEEDED(id_a != 0, &err);
@@ -282,7 +282,7 @@ static void test_edit_multisel_detail_updates(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   id_a = ptk_anm2_item_insert_value(doc, sel_id, "A", "a", &err);
   id_b = ptk_anm2_item_insert_value(doc, sel_id, "B", "b", &err);
@@ -330,7 +330,7 @@ static void test_edit_delete_selected(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   id_a = ptk_anm2_item_insert_value(doc, group_id, "A", "a", &err);
   id_b = ptk_anm2_item_insert_value(doc, group_id, "B", "b", &err);
@@ -364,7 +364,7 @@ static void test_edit_delete_multiple_selected_items(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   id_a = ptk_anm2_item_insert_value(doc, group_id, "A", "a", &err);
   id_b = ptk_anm2_item_insert_value(doc, group_id, "B", "b", &err);
@@ -406,7 +406,7 @@ static void test_edit_reverse_focus_selector(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   id_a = ptk_anm2_item_insert_value(doc, group_id, "A", "a", &err);
   id_b = ptk_anm2_item_insert_value(doc, group_id, "B", "b", &err);
@@ -440,8 +440,8 @@ static void test_edit_move_items_order(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  group_a = ptk_anm2_selector_insert(doc, 0, "A", &err);
-  group_b = ptk_anm2_selector_insert(doc, 0, "B", &err);
+  group_a = ptk_anm2_selector_insert(doc, 0, "A", 0, &err);
+  group_b = ptk_anm2_selector_insert(doc, 0, "B", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_a != 0, &err);
   TEST_ASSERT_SUCCEEDED(group_b != 0, &err);
 
@@ -487,7 +487,7 @@ static void test_edit_param_ops(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
 
   // Create animation item using insert API (at end of group)
@@ -565,7 +565,7 @@ static void test_edit_update_on_doc_op(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   item_id = ptk_anm2_item_insert_value(doc, sel_id, "A", "a", &err);
   TEST_ASSERT_SUCCEEDED(item_id != 0, &err);
@@ -615,7 +615,7 @@ static void test_update_on_doc_op_set_operations(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   id_a = ptk_anm2_item_insert_value(doc, group_id, "A", "a", &err);
   id_b = ptk_anm2_item_insert_value(doc, group_id, "B", "b", &err);
@@ -682,7 +682,7 @@ static void test_update_on_doc_op_insert_operations(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  sel1_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel1_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel1_id != 0, &err);
   id_a = ptk_anm2_item_insert_value(doc, sel1_id, "A", "a", &err);
   TEST_ASSERT_SUCCEEDED(id_a != 0, &err);
@@ -690,7 +690,7 @@ static void test_update_on_doc_op_insert_operations(void) {
   TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, id_a, false, false, false, &err), &err);
 
   // selector_insert should preserve selection
-  sel2_id = ptk_anm2_selector_insert(doc, 0, "Group2", &err);
+  sel2_id = ptk_anm2_selector_insert(doc, 0, "Group2", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel2_id != 0, &err);
   ptk_anm2_edit_update_on_doc_op(edit, ptk_anm2_op_selector_insert, sel2_id, 0, 1);
 
@@ -729,8 +729,8 @@ static void test_update_on_doc_op_move_operations(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  sel1_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
-  sel2_id = ptk_anm2_selector_insert(doc, 0, "Group2", &err);
+  sel1_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
+  sel2_id = ptk_anm2_selector_insert(doc, 0, "Group2", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel1_id != 0, &err);
   TEST_ASSERT_SUCCEEDED(sel2_id != 0, &err);
   id_a = ptk_anm2_item_insert_value(doc, sel1_id, "A", "a", &err);
@@ -785,8 +785,8 @@ static void test_update_on_doc_op_remove_selector(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  group1 = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
-  group2 = ptk_anm2_selector_insert(doc, 0, "Group2", &err);
+  group1 = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
+  group2 = ptk_anm2_selector_insert(doc, 0, "Group2", 0, &err);
   TEST_ASSERT_SUCCEEDED(group1 != 0, &err);
   TEST_ASSERT_SUCCEEDED(group2 != 0, &err);
   id_a = ptk_anm2_item_insert_value(doc, group1, "A", "a", &err);
@@ -830,7 +830,7 @@ static void test_edit_move_items_within_same_group(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   id_a = ptk_anm2_item_insert_value(doc, sel_id, "A", "a", &err);
   id_b = ptk_anm2_item_insert_value(doc, sel_id, "B", "b", &err);
@@ -877,8 +877,8 @@ static void test_edit_move_items_to_item(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  sel1_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
-  sel2_id = ptk_anm2_selector_insert(doc, 0, "Group2", &err);
+  sel1_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
+  sel2_id = ptk_anm2_selector_insert(doc, 0, "Group2", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel1_id != 0, &err);
   TEST_ASSERT_SUCCEEDED(sel2_id != 0, &err);
   id_a = ptk_anm2_item_insert_value(doc, sel1_id, "A", "a", &err);
@@ -911,7 +911,7 @@ static void test_selection_refresh_selector_removed(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  uint32_t group1 = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  uint32_t group1 = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   TEST_ASSERT_SUCCEEDED(group1 != 0, &err);
 
   // Focus on the selector
@@ -1007,7 +1007,7 @@ static void test_view_callback_on_add_selector(void) {
   struct view_callback_log log = {0};
   ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
 
-  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
 
   TEST_CHECK(log.count >= 1);
@@ -1030,7 +1030,7 @@ static void test_view_callback_on_focus_change(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  group_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  group_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   item_id = ptk_anm2_item_insert_value(doc, group_id, "Item1", "val", &err);
   TEST_ASSERT_SUCCEEDED(item_id != 0, &err);
@@ -1066,7 +1066,7 @@ static void test_view_callback_transaction_grouping(void) {
   TEST_ASSERT_SUCCEEDED(ptk_anm2_begin_transaction(doc, &err), &err);
 
   // Add multiple items - events should be emitted (not suppressed)
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   (void)ptk_anm2_item_insert_value(doc, sel_id, "Item1", "val1", &err);
   (void)ptk_anm2_item_insert_value(doc, sel_id, "Item2", "val2", &err);
 
@@ -1102,7 +1102,7 @@ static void test_view_callback_undo_redo(void) {
 
   // Add some items via transaction
   TEST_ASSERT_SUCCEEDED(ptk_anm2_begin_transaction(doc, &err), &err);
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   TEST_CHECK(sel_id != 0);
   item_id = ptk_anm2_item_insert_value(doc, sel_id, "Item1", "val1", &err);
   TEST_CHECK(item_id != 0);
@@ -1169,7 +1169,7 @@ static void test_view_callback_single_op_undo(void) {
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Add a single item (no transaction)
-  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
 
   struct view_callback_log log = {0};
@@ -1203,7 +1203,7 @@ static void test_view_callback_state_dedup(void) {
   ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
 
   // First operation: can_undo changes from false to true
-  (void)ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  (void)ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
 
   // Should have exactly 1 undo_redo_state_changed (state changed)
   TEST_CHECK(log_count_op(&log, ptk_anm2_edit_view_undo_redo_state_changed) == 1);
@@ -1214,7 +1214,7 @@ static void test_view_callback_state_dedup(void) {
   log.count = 0;
 
   // Second operation: can_undo stays true, can_redo stays false
-  (void)ptk_anm2_selector_insert(doc, 0, "Group2", &err);
+  (void)ptk_anm2_selector_insert(doc, 0, "Group2", 0, &err);
 
   // Should NOT have undo_redo_state_changed (no state change)
   TEST_CHECK(log_count_op(&log, ptk_anm2_edit_view_undo_redo_state_changed) == 0);
@@ -1254,7 +1254,7 @@ static void test_undo_restores_multiselection(void) {
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Create items A, B, C in a group
-  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   uint32_t id_a = ptk_anm2_item_insert_value(doc, group_id, "A", "a", &err);
   uint32_t id_b = ptk_anm2_item_insert_value(doc, group_id, "B", "b", &err);
@@ -1320,9 +1320,9 @@ static void test_undo_after_move_selector(void) {
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Create groups A, B, C
-  uint32_t grp_a = ptk_anm2_selector_insert(doc, 0, "A", &err);
-  uint32_t grp_b = ptk_anm2_selector_insert(doc, 0, "B", &err);
-  uint32_t grp_c = ptk_anm2_selector_insert(doc, 0, "C", &err);
+  uint32_t grp_a = ptk_anm2_selector_insert(doc, 0, "A", 0, &err);
+  uint32_t grp_b = ptk_anm2_selector_insert(doc, 0, "B", 0, &err);
+  uint32_t grp_c = ptk_anm2_selector_insert(doc, 0, "C", 0, &err);
   TEST_ASSERT_SUCCEEDED(grp_a != 0, &err);
   TEST_ASSERT_SUCCEEDED(grp_b != 0, &err);
   TEST_ASSERT_SUCCEEDED(grp_c != 0, &err);
@@ -1369,9 +1369,9 @@ static void test_view_callback_move_selector_and_undo(void) {
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Create groups A, B, C
-  uint32_t grp_a = ptk_anm2_selector_insert(doc, 0, "A", &err);
-  uint32_t grp_b = ptk_anm2_selector_insert(doc, 0, "B", &err);
-  uint32_t grp_c = ptk_anm2_selector_insert(doc, 0, "C", &err);
+  uint32_t grp_a = ptk_anm2_selector_insert(doc, 0, "A", 0, &err);
+  uint32_t grp_b = ptk_anm2_selector_insert(doc, 0, "B", 0, &err);
+  uint32_t grp_c = ptk_anm2_selector_insert(doc, 0, "C", 0, &err);
   TEST_ASSERT_SUCCEEDED(grp_a != 0, &err);
   TEST_ASSERT_SUCCEEDED(grp_b != 0, &err);
   TEST_ASSERT_SUCCEEDED(grp_c != 0, &err);
@@ -1460,7 +1460,7 @@ static void test_view_callback_move_item_and_undo(void) {
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Create group with items A, B, C
-  uint32_t grp = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  uint32_t grp = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(grp != 0, &err);
   uint32_t item_a = ptk_anm2_item_insert_value(doc, grp, "A", "a", &err);
   uint32_t item_b = ptk_anm2_item_insert_value(doc, grp, "B", "b", &err);
@@ -1535,7 +1535,7 @@ static void test_add_selector_and_undo(void) {
   ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
 
   // Simulate "existing file" by adding a selector first (direct on doc, not via edit)
-  uint32_t existing_grp = ptk_anm2_selector_insert(doc, 0, "Existing", &err);
+  uint32_t existing_grp = ptk_anm2_selector_insert(doc, 0, "Existing", 0, &err);
   TEST_ASSERT_SUCCEEDED(existing_grp != 0, &err);
 
   // Clear the log to focus on add/undo operations
@@ -1602,8 +1602,8 @@ static void test_swap_adjacent_selectors(void) {
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Create A, B - swap A with B (move A to B position = move A after B)
-  uint32_t grp_a = ptk_anm2_selector_insert(doc, 0, "A", &err);
-  uint32_t grp_b = ptk_anm2_selector_insert(doc, 0, "B", &err);
+  uint32_t grp_a = ptk_anm2_selector_insert(doc, 0, "A", 0, &err);
+  uint32_t grp_b = ptk_anm2_selector_insert(doc, 0, "B", 0, &err);
   TEST_ASSERT_SUCCEEDED(grp_a != 0, &err);
   TEST_ASSERT_SUCCEEDED(grp_b != 0, &err);
 
@@ -1641,7 +1641,7 @@ static void test_swap_adjacent_items(void) {
   struct ptk_anm2 *doc = get_doc(edit);
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
-  uint32_t grp = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  uint32_t grp = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(grp != 0, &err);
   uint32_t item_a = ptk_anm2_item_insert_value(doc, grp, "A", "a", &err);
   uint32_t item_b = ptk_anm2_item_insert_value(doc, grp, "B", "b", &err);
@@ -1680,7 +1680,7 @@ static void test_add_item_and_undo(void) {
   ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
 
   // Create a selector first
-  uint32_t grp_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
+  uint32_t grp_id = ptk_anm2_selector_insert(doc, 0, "Sel", 0, &err);
   TEST_ASSERT_SUCCEEDED(grp_id != 0, &err);
 
   log.count = 0;
@@ -1722,7 +1722,7 @@ static void test_would_move_items_selection_range(void) {
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Create A, B, C, D items in one group
-  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   uint32_t item_a = ptk_anm2_item_insert_value(doc, group_id, "A", "vA", &err);
   TEST_ASSERT_SUCCEEDED(item_a != 0, &err);
@@ -1797,7 +1797,7 @@ static void test_detail_param_insert_when_selected(void) {
   struct ptk_anm2 *doc = get_doc(edit);
 
   // Create structure
-  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_insert_animation_item(edit, group_id, "Script", "Display", &err), &err);
   uint32_t item_id = ptk_anm2_item_get_id(doc, 0, 0);
@@ -1837,7 +1837,7 @@ static void test_detail_param_insert_when_not_selected(void) {
   struct ptk_anm2 *doc = get_doc(edit);
 
   // Create structure
-  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   uint32_t item_id = ptk_anm2_item_insert_animation(doc, group_id, "Script", "Display", &err);
   TEST_CHECK(item_id != 0);
@@ -1873,7 +1873,7 @@ static void test_detail_param_update_when_selected(void) {
   struct ptk_anm2 *doc = get_doc(edit);
 
   // Create structure with param
-  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   uint32_t item_id = ptk_anm2_item_insert_animation(doc, group_id, "Script", "Display", &err);
   TEST_CHECK(item_id != 0);
@@ -1915,7 +1915,7 @@ static void test_detail_param_remove_when_selected(void) {
   struct ptk_anm2 *doc = get_doc(edit);
 
   // Create structure with param
-  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   uint32_t item_id = ptk_anm2_item_insert_animation(doc, group_id, "Script", "Display", &err);
   TEST_CHECK(item_id != 0);
@@ -1957,7 +1957,7 @@ static void test_detail_item_update_when_selected(void) {
   struct ptk_anm2 *doc = get_doc(edit);
 
   // Create structure with value item
-  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   uint32_t item_id = ptk_anm2_item_insert_value(doc, group_id, "Name", "Value", &err);
   TEST_ASSERT_SUCCEEDED(item_id != 0, &err);
@@ -2010,7 +2010,7 @@ static void test_detail_item_update_when_not_selected(void) {
   struct ptk_anm2 *doc = get_doc(edit);
 
   // Create structure with two items
-  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   uint32_t item1_id = ptk_anm2_item_insert_value(doc, group_id, "Item1", "Value1", &err);
   TEST_ASSERT_SUCCEEDED(item1_id != 0, &err);
@@ -2060,7 +2060,7 @@ static void test_detail_multisel_item_selected(void) {
   struct ptk_anm2 *doc = get_doc(edit);
 
   // Create structure with three value items
-  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   uint32_t item1_id = ptk_anm2_item_insert_value(doc, group_id, "Item1", "Value1", &err);
   TEST_ASSERT_SUCCEEDED(item1_id != 0, &err);
@@ -2114,7 +2114,7 @@ static void test_detail_multisel_item_deselected(void) {
   struct ptk_anm2 *doc = get_doc(edit);
 
   // Create structure with three value items
-  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   uint32_t item1_id = ptk_anm2_item_insert_value(doc, group_id, "Item1", "Value1", &err);
   TEST_ASSERT_SUCCEEDED(item1_id != 0, &err);
@@ -2169,7 +2169,7 @@ static void test_detail_selection_mode_switch(void) {
   struct ptk_anm2 *doc = get_doc(edit);
 
   // Create structure with two value items
-  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  uint32_t group_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
   uint32_t item1_id = ptk_anm2_item_insert_value(doc, group_id, "Item1", "Value1", &err);
   TEST_ASSERT_SUCCEEDED(item1_id != 0, &err);
@@ -2225,7 +2225,7 @@ static void test_transaction_emits_differential_events(void) {
   TEST_ASSERT_SUCCEEDED(ptk_anm2_begin_transaction(doc, &err), &err);
 
   // Add selector and items during transaction
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   uint32_t item1_id = ptk_anm2_item_insert_value(doc, sel_id, "Item1", "val1", &err);
   TEST_ASSERT_SUCCEEDED(item1_id != 0, &err);
@@ -2270,7 +2270,7 @@ static void test_move_items_selection_preserved(void) {
   TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
 
   // Create selector with 5 items
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
 
   uint32_t item1_id = ptk_anm2_item_insert_value(doc, sel_id, "Item1", "val1", &err);

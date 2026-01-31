@@ -330,13 +330,12 @@ size_t ptk_anm2_selector_count(struct ptk_anm2 const *doc);
  * @param doc Document handle
  * @param before_id ID of the selector before which to insert, or 0 for end
  * @param name Name for the new selector
+ * @param initial_userdata Initial userdata value for the selector
  * @param err Error information
  * @return ID of the new selector on success, 0 on failure
  */
-NODISCARD uint32_t ptk_anm2_selector_insert(struct ptk_anm2 *doc,
-                                            uint32_t before_id,
-                                            char const *name,
-                                            struct ov_error *const err);
+NODISCARD uint32_t ptk_anm2_selector_insert(
+    struct ptk_anm2 *doc, uint32_t before_id, char const *name, uintptr_t initial_userdata, struct ov_error *const err);
 
 /**
  * @brief Remove a selector by ID

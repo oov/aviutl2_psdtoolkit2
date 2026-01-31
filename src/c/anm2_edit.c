@@ -46,9 +46,6 @@ static int compare_drag_item_pos(void const *const a, void const *const b, void 
   return 0;
 }
 
-// Helper to notify view layer of changes
-// All events are forwarded to the view callback. The treeview handles grouping
-// via group_begin/group_end events to disable redraw during batched operations.
 static void notify_view(struct ptk_anm2_edit *edit, struct ptk_anm2_edit_view_event const *event) {
   if (!edit || !edit->view_callback || !event) {
     return;
@@ -698,8 +695,6 @@ NODISCARD bool ptk_anm2_edit_delete_selected(struct ptk_anm2_edit *edit, struct 
   }
 
   bool success = false;
-  // Delete in reverse order to avoid index invalidation when selection_refresh
-  // removes deleted items from the selection array during iteration.
   for (size_t i = count; i > 0; i--) {
     if (!ptk_anm2_item_remove(edit->doc, selected[i - 1], err)) {
       OV_ERROR_ADD_TRACE(err);
@@ -987,8 +982,9 @@ NODISCARD bool ptk_anm2_edit_add_selector(struct ptk_anm2_edit *edit, char const
     OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
     return false;
   }
-  // Insert at end (before_id = 0)
-  if (!ptk_anm2_selector_insert(edit->doc, 0, name ? name : "", err)) {
+  // Insert at end (before_id = 0) with expanded state (userdata = 1)
+  uint32_t const sel_id = ptk_anm2_selector_insert(edit->doc, 0, name ? name : "", 1, err);
+  if (!sel_id) {
     OV_ERROR_ADD_TRACE(err);
     return false;
   }
@@ -1464,6 +1460,12 @@ NODISCARD bool ptk_anm2_edit_load(struct ptk_anm2_edit *edit, wchar_t const *pat
   if (!ptk_anm2_load(edit->doc, path, err)) {
     OV_ERROR_ADD_TRACE(err);
     return false;
+  }
+  // Initialize all selectors to collapsed state
+  size_t const sel_count = ptk_anm2_selector_count(edit->doc);
+  for (size_t i = 0; i < sel_count; i++) {
+    uint32_t const sel_id = ptk_anm2_selector_get_id(edit->doc, i);
+    ptk_anm2_selector_set_userdata(edit->doc, sel_id, 0);
   }
   anm2_selection_clear(edit->selection);
   notify_view(edit, &(struct ptk_anm2_edit_view_event){.op = ptk_anm2_edit_view_treeview_rebuild});

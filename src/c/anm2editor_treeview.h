@@ -109,15 +109,6 @@ void anm2editor_treeview_set_position(struct anm2editor_treeview *tv, int x, int
 void anm2editor_treeview_rebuild(struct anm2editor_treeview *tv);
 
 /**
- * @brief Refresh the TreeView while preserving selection and scroll position
- *
- * @param tv TreeView instance
- * @param err Error information on failure
- * @return true on success
- */
-NODISCARD bool anm2editor_treeview_refresh(struct anm2editor_treeview *tv, struct ov_error *err);
-
-/**
  * @brief Update TreeView incrementally based on operation type
  *
  * @param tv TreeView instance

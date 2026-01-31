@@ -2227,8 +2227,11 @@ size_t ptk_anm2_selector_count(struct ptk_anm2 const *doc) {
   return OV_ARRAY_LENGTH(doc->selectors);
 }
 
-uint32_t
-ptk_anm2_selector_insert(struct ptk_anm2 *doc, uint32_t before_id, char const *name, struct ov_error *const err) {
+uint32_t ptk_anm2_selector_insert(struct ptk_anm2 *doc,
+                                  uint32_t before_id,
+                                  char const *name,
+                                  uintptr_t initial_userdata,
+                                  struct ov_error *const err) {
   if (!doc) {
     OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
     return 0;
@@ -2250,6 +2253,7 @@ ptk_anm2_selector_insert(struct ptk_anm2 *doc, uint32_t before_id, char const *n
     goto cleanup;
   }
   memset(new_sel, 0, sizeof(struct selector));
+  new_sel->userdata = initial_userdata;
   new_sel->id = generate_id(doc);
   new_id = new_sel->id;
 

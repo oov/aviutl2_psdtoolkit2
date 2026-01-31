@@ -71,7 +71,7 @@ static void test_reset(void) {
 
   // Add some data to the document
   {
-    uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "TestGroup", &err);
+    uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "TestGroup", 0, &err);
     TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
 
     uint32_t item_id = ptk_anm2_item_insert_value(doc, sel_id, "TestItem", "TestValue", &err);
@@ -137,7 +137,7 @@ static void test_reset_preserves_callback(void) {
   ptk_anm2_set_change_callback(doc, reset_test_callback, &g_reset_callback_count);
 
   // Add some data first
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "TestGroup", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "TestGroup", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
 
   // Reset
@@ -150,7 +150,7 @@ static void test_reset_preserves_callback(void) {
   TEST_MSG("Expected reset callback count 1, got %d", g_reset_callback_count);
 
   // Add data again - this proves the doc is still functional and callback still works
-  sel_id = ptk_anm2_selector_insert(doc, 0, "NewGroup", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "NewGroup", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
 
   TEST_CHECK(ptk_anm2_selector_count(doc) == 1);
@@ -172,7 +172,7 @@ static void test_selector_add(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  uint32_t id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   TEST_ASSERT_SUCCEEDED(id != 0, &err);
 
   TEST_CHECK(id > 0);
@@ -182,7 +182,7 @@ static void test_selector_add(void) {
   TEST_CHECK(ptk_anm2_can_undo(doc));
 
   // Add another selector and verify ID is different
-  uint32_t id2 = ptk_anm2_selector_insert(doc, 0, "Group2", &err);
+  uint32_t id2 = ptk_anm2_selector_insert(doc, 0, "Group2", 0, &err);
   TEST_ASSERT_SUCCEEDED(id2 != 0, &err);
   TEST_CHECK(id2 > id);
   TEST_MSG("Expected id2 (%u) > id (%u)", id2, id);
@@ -198,11 +198,11 @@ static void test_selector_remove(void) {
   uint32_t id2 = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  id1 = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  id1 = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(id1 != 0, &err)) {
     goto cleanup;
   }
-  id2 = ptk_anm2_selector_insert(doc, 0, "Group2", &err);
+  id2 = ptk_anm2_selector_insert(doc, 0, "Group2", 0, &err);
   if (!TEST_SUCCEEDED(id2 != 0, &err)) {
     goto cleanup;
   }
@@ -224,7 +224,7 @@ static void test_selector_set_group(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t id = ptk_anm2_selector_insert(doc, 0, "Original", &err);
+  uint32_t id = ptk_anm2_selector_insert(doc, 0, "Original", 0, &err);
   if (!TEST_SUCCEEDED(id != 0, &err)) {
     goto cleanup;
   }
@@ -247,15 +247,15 @@ static void test_selector_move_to(void) {
   uint32_t id_c = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  id_a = ptk_anm2_selector_insert(doc, 0, "A", &err);
+  id_a = ptk_anm2_selector_insert(doc, 0, "A", 0, &err);
   if (!TEST_SUCCEEDED(id_a != 0, &err)) {
     goto cleanup;
   }
-  id_b = ptk_anm2_selector_insert(doc, 0, "B", &err);
+  id_b = ptk_anm2_selector_insert(doc, 0, "B", 0, &err);
   if (!TEST_SUCCEEDED(id_b != 0, &err)) {
     goto cleanup;
   }
-  id_c = ptk_anm2_selector_insert(doc, 0, "C", &err);
+  id_c = ptk_anm2_selector_insert(doc, 0, "C", 0, &err);
   if (!TEST_SUCCEEDED(id_c != 0, &err)) {
     goto cleanup;
   }
@@ -279,7 +279,7 @@ static void test_selector_undo_redo(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  uint32_t id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(id != 0, &err)) {
     goto cleanup;
   }
@@ -310,7 +310,7 @@ static void test_item_add_value(void) {
   uint32_t id2 = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -347,7 +347,7 @@ static void test_item_insert_value(void) {
   uint32_t id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -390,7 +390,7 @@ static void test_item_add_animation(void) {
   uint32_t id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -422,7 +422,7 @@ static void test_item_insert_animation(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -470,7 +470,7 @@ static void test_item_remove(void) {
   uint32_t item1_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -505,7 +505,7 @@ static void test_item_move_after(void) {
   uint32_t item_c = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -550,7 +550,7 @@ static void test_item_undo_redo(void) {
   uint32_t sel_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -587,7 +587,7 @@ static void test_param_add(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -622,7 +622,7 @@ static void test_param_insert_after_by_id(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -675,7 +675,7 @@ static void test_param_remove(void) {
   uint32_t param1_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -714,7 +714,7 @@ static void test_param_set_key_value(void) {
   uint32_t param_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -748,7 +748,7 @@ static void test_param_undo_redo(void) {
   uint32_t item_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -789,9 +789,9 @@ static void test_selector_id_userdata(void) {
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Add two selectors
-  id1 = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  id1 = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   TEST_ASSERT_SUCCEEDED(id1 != 0, &err);
-  id2 = ptk_anm2_selector_insert(doc, 0, "Group2", &err);
+  id2 = ptk_anm2_selector_insert(doc, 0, "Group2", 0, &err);
   TEST_ASSERT_SUCCEEDED(id2 != 0, &err);
 
   // IDs should be unique and non-zero
@@ -806,9 +806,14 @@ static void test_selector_id_userdata(void) {
   // Invalid index should return 0
   TEST_CHECK(ptk_anm2_selector_get_id(doc, 999) == 0);
 
-  // Test userdata (default is 0)
+  // Test userdata (initial_userdata = 0 was passed)
   TEST_CHECK(ptk_anm2_selector_get_userdata(doc, id1) == 0);
   TEST_CHECK(ptk_anm2_selector_get_userdata(doc, id2) == 0);
+
+  // Test initial_userdata = 1
+  uint32_t id3 = ptk_anm2_selector_insert(doc, 0, "Group3", 1, &err);
+  TEST_ASSERT_SUCCEEDED(id3 != 0, &err);
+  TEST_CHECK(ptk_anm2_selector_get_userdata(doc, id3) == 1);
 
   // Set and get userdata
   ptk_anm2_selector_set_userdata(doc, id1, 0x12345678);
@@ -832,7 +837,7 @@ static void test_item_id_userdata(void) {
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Add a selector
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
 
   // Add items
@@ -880,7 +885,7 @@ static void test_param_id_userdata(void) {
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Add a selector and animation item
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!sel_id) {
     goto cleanup;
   }
@@ -932,11 +937,11 @@ static void test_find_selector_by_id(void) {
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Add selectors
-  id1 = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  id1 = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   TEST_ASSERT_SUCCEEDED(id1 != 0, &err);
-  id2 = ptk_anm2_selector_insert(doc, 0, "Group2", &err);
+  id2 = ptk_anm2_selector_insert(doc, 0, "Group2", 0, &err);
   TEST_ASSERT_SUCCEEDED(id2 != 0, &err);
-  id3 = ptk_anm2_selector_insert(doc, 0, "Group3", &err);
+  id3 = ptk_anm2_selector_insert(doc, 0, "Group3", 0, &err);
   TEST_ASSERT_SUCCEEDED(id3 != 0, &err);
 
   // Find by ID
@@ -982,9 +987,9 @@ static void test_find_item_by_id(void) {
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Add selectors and items
-  sel_id1 = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id1 = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id1 != 0, &err);
-  sel_id2 = ptk_anm2_selector_insert(doc, 0, "Group2", &err);
+  sel_id2 = ptk_anm2_selector_insert(doc, 0, "Group2", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id2 != 0, &err);
 
   item_id1 = ptk_anm2_item_insert_value(doc, sel_id1, "Item1", "path1", &err);
@@ -1049,11 +1054,11 @@ static void test_find_param_by_id(void) {
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Add selector with animation items (only animation items can have params)
-  sel_id1 = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id1 = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id1 != 0, &err)) {
     goto cleanup;
   }
-  sel_id2 = ptk_anm2_selector_insert(doc, 0, "Group2", &err);
+  sel_id2 = ptk_anm2_selector_insert(doc, 0, "Group2", 0, &err);
   if (!TEST_SUCCEEDED(sel_id2 != 0, &err)) {
     goto cleanup;
   }
@@ -1211,7 +1216,7 @@ static void test_transaction_basic(void) {
   if (!TEST_SUCCEEDED(ptk_anm2_set_psd_path(doc, "path.psd", &err), &err)) {
     goto cleanup;
   }
-  if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Group1", &err), &err)) {
+  if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err), &err)) {
     goto cleanup;
   }
 
@@ -1265,7 +1270,7 @@ static void test_transaction_nested(void) {
     goto cleanup;
   }
 
-  if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Nested", &err), &err)) {
+  if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Nested", 0, &err), &err)) {
     goto cleanup;
   }
 
@@ -1348,7 +1353,7 @@ static void test_change_callback_basic(void) {
 
   // Test selector_add triggers callback
   callback_tracker_clear(&tracker);
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -1399,10 +1404,10 @@ static void test_change_callback_transaction(void) {
 
   // Operations inside transaction
   callback_tracker_clear(&tracker);
-  if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Group1", &err) != 0, &err)) {
+  if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err) != 0, &err)) {
     goto cleanup;
   }
-  if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Group2", &err) != 0, &err)) {
+  if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Group2", 0, &err) != 0, &err)) {
     goto cleanup;
   }
   TEST_CHECK(tracker.count == 2);
@@ -1437,10 +1442,10 @@ static void test_change_callback_undo_redo_transaction(void) {
   if (!TEST_SUCCEEDED(ptk_anm2_begin_transaction(doc, &err), &err)) {
     goto cleanup;
   }
-  if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Group1", &err) != 0, &err)) {
+  if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err) != 0, &err)) {
     goto cleanup;
   }
-  if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Group2", &err) != 0, &err)) {
+  if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Group2", 0, &err) != 0, &err)) {
     goto cleanup;
   }
   if (!TEST_SUCCEEDED(ptk_anm2_end_transaction(doc, &err), &err)) {
@@ -1604,7 +1609,7 @@ static void test_invalid_item_index(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Group1", &err), &err)) {
+  if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err), &err)) {
     goto cleanup;
   }
 
@@ -1624,7 +1629,7 @@ static void test_invalid_param_index(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -1652,7 +1657,7 @@ static void test_param_on_value_item(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -1916,7 +1921,7 @@ static void test_save_load_roundtrip(void) {
   }
 
   // Add selector with value items
-  sel_id1 = ptk_anm2_selector_insert(doc, 0, "表情", &err);
+  sel_id1 = ptk_anm2_selector_insert(doc, 0, "表情", 0, &err);
   if (!TEST_SUCCEEDED(sel_id1 != 0, &err)) {
     goto cleanup;
   }
@@ -1928,7 +1933,7 @@ static void test_save_load_roundtrip(void) {
   }
 
   // Add selector with animation item
-  sel_id2 = ptk_anm2_selector_insert(doc, 0, "目パチ", &err);
+  sel_id2 = ptk_anm2_selector_insert(doc, 0, "目パチ", 0, &err);
   if (!TEST_SUCCEEDED(sel_id2 != 0, &err)) {
     goto cleanup;
   }
@@ -2109,7 +2114,7 @@ static void test_load_clears_undo(void) {
   if (!TEST_SUCCEEDED(ptk_anm2_set_psd_path(doc, "test.psd", &err), &err)) {
     goto cleanup;
   }
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -2202,7 +2207,7 @@ static void test_save_load_empty_param_value(void) {
   if (!TEST_SUCCEEDED(ptk_anm2_set_psd_path(doc, "test.psd", &err), &err)) {
     goto cleanup;
   }
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Test", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Test", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -2306,7 +2311,7 @@ static void test_generate_script_single_selector(void) {
   if (!TEST_SUCCEEDED(ptk_anm2_set_psd_path(doc, "test.psd", &err), &err)) {
     goto cleanup;
   }
-  sel_id = ptk_anm2_selector_insert(doc, 0, "表情", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "表情", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -2357,7 +2362,7 @@ static void test_generate_script_multiple_selectors(void) {
   }
 
   // First selector
-  sel_id1 = ptk_anm2_selector_insert(doc, 0, "表情", &err);
+  sel_id1 = ptk_anm2_selector_insert(doc, 0, "表情", 0, &err);
   if (!TEST_SUCCEEDED(sel_id1 != 0, &err)) {
     goto cleanup;
   }
@@ -2366,7 +2371,7 @@ static void test_generate_script_multiple_selectors(void) {
   }
 
   // Second selector
-  sel_id2 = ptk_anm2_selector_insert(doc, 0, "目パチ", &err);
+  sel_id2 = ptk_anm2_selector_insert(doc, 0, "目パチ", 0, &err);
   if (!TEST_SUCCEEDED(sel_id2 != 0, &err)) {
     goto cleanup;
   }
@@ -2427,12 +2432,12 @@ static void test_generate_script_empty_selector_skipped(void) {
   }
 
   // First selector (empty - should be skipped)
-  if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Empty", &err), &err)) {
+  if (!TEST_SUCCEEDED(ptk_anm2_selector_insert(doc, 0, "Empty", 0, &err), &err)) {
     goto cleanup;
   }
 
   // Second selector (has items)
-  sel_id2 = ptk_anm2_selector_insert(doc, 0, "表情", &err);
+  sel_id2 = ptk_anm2_selector_insert(doc, 0, "表情", 0, &err);
   if (!TEST_SUCCEEDED(sel_id2 != 0, &err)) {
     goto cleanup;
   }
@@ -2480,7 +2485,7 @@ static void test_generate_script_animation_params(void) {
   if (!TEST_SUCCEEDED(ptk_anm2_set_psd_path(doc, "test.psd", &err), &err)) {
     goto cleanup;
   }
-  sel_id = ptk_anm2_selector_insert(doc, 0, "目パチ", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "目パチ", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -2529,7 +2534,7 @@ static void test_generate_script_null_param_value(void) {
   if (!TEST_SUCCEEDED(ptk_anm2_set_psd_path(doc, "test.psd", &err), &err)) {
     goto cleanup;
   }
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Test", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Test", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -2579,7 +2584,7 @@ static void test_verify_checksum(void) {
   if (!TEST_SUCCEEDED(ptk_anm2_set_psd_path(doc, "test.psd", &err), &err)) {
     goto cleanup;
   }
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -2622,7 +2627,7 @@ static void test_item_set_script_name(void) {
   uint32_t anim_item_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -2654,7 +2659,7 @@ static void test_item_set_script_name_on_value_item(void) {
   uint32_t value_item_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -2682,7 +2687,7 @@ static void test_selector_set_group_undo_redo(void) {
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Setup: add selector with items
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Original", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Original", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -2890,7 +2895,7 @@ static void test_item_set_name_undo_redo(void) {
   uint32_t item_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -2939,7 +2944,7 @@ static void test_item_set_value_undo_redo(void) {
   uint32_t item_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -2988,7 +2993,7 @@ static void test_item_set_script_name_undo_redo(void) {
   uint32_t anim_item_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -3038,7 +3043,7 @@ static void test_param_set_key_undo_redo(void) {
   uint32_t param_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -3083,7 +3088,7 @@ static void test_param_set_value_undo_redo(void) {
   uint32_t param_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -3128,15 +3133,15 @@ static void test_selector_move_to_undo_redo(void) {
   uint32_t id_c = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  id_a = ptk_anm2_selector_insert(doc, 0, "A", &err);
+  id_a = ptk_anm2_selector_insert(doc, 0, "A", 0, &err);
   if (!TEST_SUCCEEDED(id_a != 0, &err)) {
     goto cleanup;
   }
-  id_b = ptk_anm2_selector_insert(doc, 0, "B", &err);
+  id_b = ptk_anm2_selector_insert(doc, 0, "B", 0, &err);
   if (!TEST_SUCCEEDED(id_b != 0, &err)) {
     goto cleanup;
   }
-  id_c = ptk_anm2_selector_insert(doc, 0, "C", &err);
+  id_c = ptk_anm2_selector_insert(doc, 0, "C", 0, &err);
   if (!TEST_SUCCEEDED(id_c != 0, &err)) {
     goto cleanup;
   }
@@ -3183,7 +3188,7 @@ static void test_item_move_after_undo_redo(void) {
   uint32_t item_id_c = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -3268,7 +3273,7 @@ static void test_selector_remove_undo_redo(void) {
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
   // Add selector with items
-  id1 = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  id1 = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(id1 != 0, &err)) {
     goto cleanup;
   }
@@ -3280,7 +3285,7 @@ static void test_selector_remove_undo_redo(void) {
   }
 
   // Add another selector
-  id2 = ptk_anm2_selector_insert(doc, 0, "Group2", &err);
+  id2 = ptk_anm2_selector_insert(doc, 0, "Group2", 0, &err);
   if (!TEST_SUCCEEDED(id2 != 0, &err)) {
     goto cleanup;
   }
@@ -3334,7 +3339,7 @@ static void test_item_remove_undo_redo(void) {
   uint32_t anim_item_id = 0;
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -3575,7 +3580,7 @@ static void test_save_load_exclusive_support_and_information(void) {
   if (!TEST_SUCCEEDED(ptk_anm2_set_psd_path(doc, "test.psd", &err), &err)) {
     goto cleanup;
   }
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Group", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -3637,7 +3642,7 @@ static void test_generate_script_with_exclusive_support(void) {
   if (!TEST_SUCCEEDED(ptk_anm2_set_psd_path(doc, "test.psd", &err), &err)) {
     goto cleanup;
   }
-  sel_id = ptk_anm2_selector_insert(doc, 0, "表情", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "表情", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -3687,7 +3692,7 @@ static void test_generate_script_with_custom_information(void) {
   if (!TEST_SUCCEEDED(ptk_anm2_set_psd_path(doc, "path/to/test.psd", &err), &err)) {
     goto cleanup;
   }
-  sel_id = ptk_anm2_selector_insert(doc, 0, "表情", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "表情", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }
@@ -3823,7 +3828,7 @@ static void test_undo_callback_selector_insert(void) {
 
   ptk_anm2_set_change_callback(doc, test_change_callback_fn, &tracker);
 
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Test", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Test", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
 
   callback_tracker_clear(&tracker);
@@ -3854,7 +3859,7 @@ static void test_undo_callback_selector_remove(void) {
 
   ptk_anm2_set_change_callback(doc, test_change_callback_fn, &tracker);
 
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Test", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Test", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
 
   TEST_ASSERT_SUCCEEDED(ptk_anm2_selector_remove(doc, sel_id, &err), &err);
@@ -3885,7 +3890,7 @@ static void test_undo_callback_item_insert(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
 
   ptk_anm2_set_change_callback(doc, test_change_callback_fn, &tracker);
@@ -3920,7 +3925,7 @@ static void test_undo_callback_item_remove(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
 
   uint32_t item_id = ptk_anm2_item_insert_value(doc, sel_id, "name", "value", &err);
@@ -3957,7 +3962,7 @@ static void test_undo_callback_param_insert(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
 
   uint32_t item_id = ptk_anm2_item_insert_animation(doc, sel_id, "script", "anim", &err);
@@ -3995,7 +4000,7 @@ static void test_undo_callback_param_remove(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
 
   uint32_t item_id = ptk_anm2_item_insert_animation(doc, sel_id, "script", "anim", &err);
@@ -4035,7 +4040,7 @@ static void test_undo_callback_selector_set_group(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
 
   ptk_anm2_set_change_callback(doc, test_change_callback_fn, &tracker);
@@ -4067,9 +4072,9 @@ static void test_undo_callback_selector_move(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t sel1_id = ptk_anm2_selector_insert(doc, 0, "Sel1", &err);
+  uint32_t sel1_id = ptk_anm2_selector_insert(doc, 0, "Sel1", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel1_id != 0, &err);
-  uint32_t sel2_id = ptk_anm2_selector_insert(doc, 0, "Sel2", &err);
+  uint32_t sel2_id = ptk_anm2_selector_insert(doc, 0, "Sel2", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel2_id != 0, &err);
 
   ptk_anm2_set_change_callback(doc, test_change_callback_fn, &tracker);
@@ -4101,7 +4106,7 @@ static void test_undo_callback_item_set_name(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   uint32_t item_id = ptk_anm2_item_insert_value(doc, sel_id, "name", "value", &err);
   TEST_ASSERT_SUCCEEDED(item_id != 0, &err);
@@ -4135,7 +4140,7 @@ static void test_undo_callback_item_set_value(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   uint32_t item_id = ptk_anm2_item_insert_value(doc, sel_id, "name", "value", &err);
   TEST_ASSERT_SUCCEEDED(item_id != 0, &err);
@@ -4169,7 +4174,7 @@ static void test_undo_callback_item_set_script_name(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   uint32_t item_id = ptk_anm2_item_insert_animation(doc, sel_id, "script", "name", &err);
   TEST_ASSERT_SUCCEEDED(item_id != 0, &err);
@@ -4203,7 +4208,7 @@ static void test_undo_callback_item_move(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   uint32_t item1_id = ptk_anm2_item_insert_value(doc, sel_id, "name1", "value1", &err);
   TEST_ASSERT_SUCCEEDED(item1_id != 0, &err);
@@ -4242,7 +4247,7 @@ static void test_undo_callback_param_set_key(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   uint32_t item_id = ptk_anm2_item_insert_animation(doc, sel_id, "script", "name", &err);
   TEST_ASSERT_SUCCEEDED(item_id != 0, &err);
@@ -4295,7 +4300,7 @@ static void test_undo_callback_param_set_value(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Sel", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   uint32_t item_id = ptk_anm2_item_insert_animation(doc, sel_id, "script", "name", &err);
   TEST_ASSERT_SUCCEEDED(item_id != 0, &err);
@@ -4460,7 +4465,7 @@ static void test_item_would_move_same_position(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   uint32_t item_a = ptk_anm2_item_insert_value(doc, sel_id, "A", "pathA", &err);
   TEST_ASSERT_SUCCEEDED(item_a != 0, &err);
@@ -4499,7 +4504,7 @@ static void test_item_would_move_actual_move(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
   uint32_t item_a = ptk_anm2_item_insert_value(doc, sel_id, "A", "pathA", &err);
   TEST_ASSERT_SUCCEEDED(item_a != 0, &err);
@@ -4530,11 +4535,11 @@ static void test_selector_would_move_same_position(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t sel_a = ptk_anm2_selector_insert(doc, 0, "A", &err);
+  uint32_t sel_a = ptk_anm2_selector_insert(doc, 0, "A", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_a != 0, &err);
-  uint32_t sel_b = ptk_anm2_selector_insert(doc, 0, "B", &err);
+  uint32_t sel_b = ptk_anm2_selector_insert(doc, 0, "B", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_b != 0, &err);
-  uint32_t sel_c = ptk_anm2_selector_insert(doc, 0, "C", &err);
+  uint32_t sel_c = ptk_anm2_selector_insert(doc, 0, "C", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_c != 0, &err);
 
   // Current order: A(0), B(1), C(2)
@@ -4559,11 +4564,11 @@ static void test_selector_would_move_actual_move(void) {
   struct ptk_anm2 *doc = ptk_anm2_create(&err);
   TEST_ASSERT_SUCCEEDED(doc != NULL, &err);
 
-  uint32_t sel_a = ptk_anm2_selector_insert(doc, 0, "A", &err);
+  uint32_t sel_a = ptk_anm2_selector_insert(doc, 0, "A", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_a != 0, &err);
-  uint32_t sel_b = ptk_anm2_selector_insert(doc, 0, "B", &err);
+  uint32_t sel_b = ptk_anm2_selector_insert(doc, 0, "B", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_b != 0, &err);
-  uint32_t sel_c = ptk_anm2_selector_insert(doc, 0, "C", &err);
+  uint32_t sel_c = ptk_anm2_selector_insert(doc, 0, "C", 0, &err);
   TEST_ASSERT_SUCCEEDED(sel_c != 0, &err);
 
   // Current order: A(0), B(1), C(2)
@@ -4681,7 +4686,7 @@ static void test_save_load_multiscript(void) {
     goto cleanup;
   }
 
-  sel_id = ptk_anm2_selector_insert(doc, 0, "Expression", &err);
+  sel_id = ptk_anm2_selector_insert(doc, 0, "Expression", 0, &err);
   if (!TEST_SUCCEEDED(sel_id != 0, &err)) {
     goto cleanup;
   }

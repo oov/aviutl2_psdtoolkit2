@@ -352,30 +352,6 @@ static bool clear_document(struct ptk_anm2editor *editor, struct ov_error *const
 }
 
 /**
- * @brief Refresh all UI views to reflect current document state
- *
- * Updates TreeView, detail pane, and window title.
- *
- * @param editor Editor instance
- * @param err Error information
- * @return true on success, false on failure
- */
-static bool refresh_all_views(struct ptk_anm2editor *editor, struct ov_error *const err) {
-  if (!editor) {
-    OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
-    return false;
-  }
-  if (!anm2editor_treeview_refresh(editor->treeview, err)) {
-    OV_ERROR_ADD_TRACE(err);
-    return false;
-  }
-  anm2editor_detail_refresh(editor->detail);
-  update_window_title(editor);
-  update_toolbar_state(editor);
-  return true;
-}
-
-/**
  * @brief Callback for when selection changes in the detail list
  */
 static void on_detail_selection_changed(void *userdata) {
@@ -1265,10 +1241,6 @@ bool ptk_anm2editor_new_document(struct ptk_anm2editor *editor, struct ov_error 
   }
 
   if (!clear_document(editor, err)) {
-    OV_ERROR_ADD_TRACE(err);
-    return false;
-  }
-  if (!refresh_all_views(editor, err)) {
     OV_ERROR_ADD_TRACE(err);
     return false;
   }
