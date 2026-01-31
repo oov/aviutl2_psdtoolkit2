@@ -298,6 +298,8 @@ static void on_edit_view_change(void *userdata, struct ptk_anm2_edit_view_event 
   case ptk_anm2_edit_view_treeview_move_item:
   case ptk_anm2_edit_view_treeview_select:
   case ptk_anm2_edit_view_treeview_set_focus:
+  case ptk_anm2_edit_view_treeview_group_begin:
+  case ptk_anm2_edit_view_treeview_group_end:
     // Handled by treeview component
     break;
 

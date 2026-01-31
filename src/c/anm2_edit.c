@@ -18,14 +18,13 @@ struct ptk_anm2_edit {
   struct ptk_anm2_script_mapper *script_mapper;
   ptk_anm2_edit_view_callback view_callback;
   void *view_userdata;
-  // Transaction tracking for buffering events during UNDO/REDO
+  // Transaction tracking for group_begin/group_end events during UNDO/REDO
   int transaction_depth;
   // State tracking for change detection
   bool prev_can_undo;
   bool prev_can_redo;
   bool prev_modified;
   bool prev_can_save;
-  bool needs_rebuild;
 };
 
 struct drag_item_pos {
@@ -48,22 +47,10 @@ static int compare_drag_item_pos(void const *const a, void const *const b, void 
 }
 
 // Helper to notify view layer of changes
-// During transactions (transaction_depth != 0), structural events are suppressed
-// and needs_rebuild is set instead. State change events are always forwarded.
-// Note: depth can be negative during UNDO (GROUP_END comes before GROUP_BEGIN).
+// All events are forwarded to the view callback. The treeview handles grouping
+// via group_begin/group_end events to disable redraw during batched operations.
 static void notify_view(struct ptk_anm2_edit *edit, struct ptk_anm2_edit_view_event const *event) {
   if (!edit || !edit->view_callback || !event) {
-    return;
-  }
-  // State change events are always forwarded
-  if (event->op == ptk_anm2_edit_view_undo_redo_state_changed ||
-      event->op == ptk_anm2_edit_view_modified_state_changed || event->op == ptk_anm2_edit_view_save_state_changed) {
-    edit->view_callback(edit->view_userdata, event);
-    return;
-  }
-  // During transactions (depth != 0), suppress structural events and mark for rebuild
-  if (edit->transaction_depth != 0) {
-    edit->needs_rebuild = true;
     return;
   }
   edit->view_callback(edit->view_userdata, event);
@@ -459,26 +446,28 @@ void ptk_anm2_edit_update_on_doc_op(
 
   case ptk_anm2_op_transaction_begin:
     // Start of transaction (or end of UNDO group): increment depth
-    edit->transaction_depth++;
-    // When depth returns to 0 (UNDO case: was -1, now 0), emit rebuild
-    if (edit->transaction_depth == 0 && edit->needs_rebuild) {
-      edit->needs_rebuild = false;
-      event.op = ptk_anm2_edit_view_treeview_rebuild;
+    // When depth goes from 0 to 1, emit group_begin to disable redraw
+    // When depth goes from -1 to 0 (end of UNDO group), emit group_end to enable redraw
+    if (edit->transaction_depth == 0) {
+      event.op = ptk_anm2_edit_view_treeview_group_begin;
       notify_view(edit, &event);
-      event.op = ptk_anm2_edit_view_detail_refresh;
+    } else if (edit->transaction_depth == -1) {
+      event.op = ptk_anm2_edit_view_treeview_group_end;
       notify_view(edit, &event);
     }
+    edit->transaction_depth++;
     break;
 
   case ptk_anm2_op_transaction_end:
     // End of transaction (or start of UNDO group): decrement depth
+    // When depth goes from 1 to 0, emit group_end to enable redraw
+    // When depth goes from 0 to -1 (start of UNDO group), emit group_begin to disable redraw
     edit->transaction_depth--;
-    // When depth returns to 0 (normal case: was 1, now 0), emit rebuild
-    if (edit->transaction_depth == 0 && edit->needs_rebuild) {
-      edit->needs_rebuild = false;
-      event.op = ptk_anm2_edit_view_treeview_rebuild;
+    if (edit->transaction_depth == 0) {
+      event.op = ptk_anm2_edit_view_treeview_group_end;
       notify_view(edit, &event);
-      event.op = ptk_anm2_edit_view_detail_refresh;
+    } else if (edit->transaction_depth == -1) {
+      event.op = ptk_anm2_edit_view_treeview_group_begin;
       notify_view(edit, &event);
     }
     break;
@@ -709,8 +698,10 @@ NODISCARD bool ptk_anm2_edit_delete_selected(struct ptk_anm2_edit *edit, struct 
   }
 
   bool success = false;
-  for (size_t i = 0; i < count; i++) {
-    if (!ptk_anm2_item_remove(edit->doc, selected[i], err)) {
+  // Delete in reverse order to avoid index invalidation when selection_refresh
+  // removes deleted items from the selection array during iteration.
+  for (size_t i = count; i > 0; i--) {
+    if (!ptk_anm2_item_remove(edit->doc, selected[i - 1], err)) {
       OV_ERROR_ADD_TRACE(err);
       goto cleanup;
     }
@@ -807,14 +798,27 @@ NODISCARD bool ptk_anm2_edit_move_items(struct ptk_anm2_edit *edit,
     return true; // No-op, but not an error
   }
 
+  // Copy item_ids to avoid issues when the caller passes edit->selection->selected_item_ids directly.
+  // The selection array may be reallocated during move operations, invalidating the original pointer.
+  uint32_t *item_ids_copy = NULL;
+  struct drag_item_pos *sorted_items = NULL;
+  size_t sorted_count = 0;
+  bool success = false;
+  bool in_transaction = false;
   size_t dst_sel = 0;
   uint32_t dst_selector_id = 0;
   uint32_t before_id = 0;
 
+  if (!OV_REALLOC(&item_ids_copy, item_count, sizeof(uint32_t))) {
+    OV_ERROR_SET_GENERIC(err, ov_error_generic_out_of_memory);
+    goto cleanup;
+  }
+  memcpy(item_ids_copy, item_ids, item_count * sizeof(uint32_t));
+
   if (dropped_on_is_selector) {
     if (!ptk_anm2_find_selector(edit->doc, dropped_on_id, &dst_sel)) {
       OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
-      return false;
+      goto cleanup;
     }
     dst_selector_id = dropped_on_id;
     before_id = dst_selector_id; // Append at end (insert_after is irrelevant for selector drop)
@@ -822,7 +826,7 @@ NODISCARD bool ptk_anm2_edit_move_items(struct ptk_anm2_edit *edit,
     size_t dst_item_idx = 0;
     if (!ptk_anm2_find_item(edit->doc, dropped_on_id, &dst_sel, &dst_item_idx)) {
       OV_ERROR_SET_GENERIC(err, ov_error_generic_invalid_argument);
-      return false;
+      goto cleanup;
     }
     dst_selector_id = ptk_anm2_selector_get_id(edit->doc, dst_sel);
 
@@ -840,12 +844,7 @@ NODISCARD bool ptk_anm2_edit_move_items(struct ptk_anm2_edit *edit,
     }
   }
 
-  struct drag_item_pos *sorted_items = NULL;
-  size_t sorted_count = 0;
-  bool success = false;
-  bool in_transaction = false;
-
-  if (!collect_sorted_items(edit->doc, item_ids, item_count, &sorted_items, &sorted_count, err)) {
+  if (!collect_sorted_items(edit->doc, item_ids_copy, item_count, &sorted_items, &sorted_count, err)) {
     OV_ERROR_ADD_TRACE(err);
     goto cleanup;
   }
@@ -865,9 +864,20 @@ NODISCARD bool ptk_anm2_edit_move_items(struct ptk_anm2_edit *edit,
     }
   }
 
+  // Update selection state BEFORE ending transaction
+  // This ensures the selection is correct when group_end triggers redraw
+  if (!anm2_selection_replace_selected_items(
+          edit->selection, item_ids_copy, item_count, item_ids_copy[0], item_ids_copy[0], err)) {
+    OV_ERROR_ADD_TRACE(err);
+    goto cleanup;
+  }
+
   success = true;
 
 cleanup:
+  if (item_ids_copy) {
+    OV_FREE(&item_ids_copy);
+  }
   if (sorted_items) {
     OV_FREE(&sorted_items);
   }
@@ -877,12 +887,6 @@ cleanup:
         OV_ERROR_ADD_TRACE(err);
         success = false;
       }
-    }
-  }
-  if (success) {
-    if (!anm2_selection_replace_selected_items(edit->selection, item_ids, item_count, item_ids[0], item_ids[0], err)) {
-      OV_ERROR_ADD_TRACE(err);
-      success = false;
     }
   }
   return success;

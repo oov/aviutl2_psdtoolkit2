@@ -351,6 +351,48 @@ static void test_edit_delete_selected(void) {
   ptk_anm2_edit_destroy(&edit);
 }
 
+static void test_edit_delete_multiple_selected_items(void) {
+  struct ov_error err = {0};
+  struct ptk_anm2_edit *edit = NULL;
+  uint32_t group_id = 0;
+  uint32_t id_a = 0;
+  uint32_t id_b = 0;
+  uint32_t id_c = 0;
+
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+
+  group_id = ptk_anm2_selector_insert(doc, 0, "Group", &err);
+  TEST_ASSERT_SUCCEEDED(group_id != 0, &err);
+  id_a = ptk_anm2_item_insert_value(doc, group_id, "A", "a", &err);
+  id_b = ptk_anm2_item_insert_value(doc, group_id, "B", "b", &err);
+  id_c = ptk_anm2_item_insert_value(doc, group_id, "C", "c", &err);
+  TEST_ASSERT_SUCCEEDED(id_a != 0, &err);
+  TEST_ASSERT_SUCCEEDED(id_b != 0, &err);
+  TEST_ASSERT_SUCCEEDED(id_c != 0, &err);
+
+  // Select all three items (multiple selection)
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, id_a, false, false, false, &err), &err);
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, id_b, false, true, false, &err), &err);
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, id_c, false, true, false, &err), &err);
+
+  // Verify all three are selected
+  TEST_CHECK(ptk_anm2_edit_get_selected_item_count(edit) == 3);
+
+  // Delete all selected items at once
+  // This tests that iteration over selection works correctly even when
+  // anm2_selection_refresh() removes deleted items from the array during iteration.
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_delete_selected(edit, &err), &err);
+
+  // All items should be deleted
+  TEST_CHECK(ptk_anm2_item_count(doc, group_id) == 0);
+  TEST_CHECK(ptk_anm2_selector_count(doc) == 1);
+
+  ptk_anm2_edit_destroy(&edit);
+}
+
 static void test_edit_reverse_focus_selector(void) {
   struct ov_error err = {0};
   struct ptk_anm2_edit *edit = NULL;
@@ -1006,7 +1048,8 @@ static void test_view_callback_on_focus_change(void) {
   ptk_anm2_edit_destroy(&edit);
 }
 
-static void test_view_callback_transaction_buffering(void) {
+// Test: transaction wraps differential events with group_begin/group_end
+static void test_view_callback_transaction_grouping(void) {
   struct ov_error err = {0};
   struct ptk_anm2_edit *edit = NULL;
   uint32_t sel_id = 0;
@@ -1022,46 +1065,30 @@ static void test_view_callback_transaction_buffering(void) {
   // Start transaction
   TEST_ASSERT_SUCCEEDED(ptk_anm2_begin_transaction(doc, &err), &err);
 
-  // Add multiple items - events should be suppressed during transaction
+  // Add multiple items - events should be emitted (not suppressed)
   sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
   (void)ptk_anm2_item_insert_value(doc, sel_id, "Item1", "val1", &err);
   (void)ptk_anm2_item_insert_value(doc, sel_id, "Item2", "val2", &err);
 
-  // During transaction, only state change events should be forwarded
-  // Structural events (insert_group, insert_item) should be suppressed
-  size_t structural_count = 0;
-  for (size_t i = 0; i < log.count; ++i) {
-    if (log.ops[i] != ptk_anm2_edit_view_undo_redo_state_changed &&
-        log.ops[i] != ptk_anm2_edit_view_modified_state_changed &&
-        log.ops[i] != ptk_anm2_edit_view_save_state_changed) {
-      structural_count++;
-    }
-  }
-  TEST_CHECK(structural_count == 0);
-
-  // Clear log before end_transaction
-  log.count = 0;
-
-  // End transaction - should trigger rebuild
+  // End transaction
   TEST_ASSERT_SUCCEEDED(ptk_anm2_end_transaction(doc, &err), &err);
 
-  // After transaction ends, should have rebuild + detail_refresh
-  bool has_rebuild = false;
-  bool has_detail_refresh = false;
-  for (size_t i = 0; i < log.count; ++i) {
-    if (log.ops[i] == ptk_anm2_edit_view_treeview_rebuild) {
-      has_rebuild = true;
-    }
-    if (log.ops[i] == ptk_anm2_edit_view_detail_refresh) {
-      has_detail_refresh = true;
-    }
-  }
-  TEST_CHECK(has_rebuild);
-  TEST_CHECK(has_detail_refresh);
+  // Verify: group_begin, differential events, group_end
+  TEST_CHECK(log_contains_op(&log, ptk_anm2_edit_view_treeview_group_begin));
+  TEST_MSG("Should emit group_begin at transaction start");
+  TEST_CHECK(log_contains_op(&log, ptk_anm2_edit_view_treeview_group_end));
+  TEST_MSG("Should emit group_end at transaction end");
+  TEST_CHECK(log_contains_op(&log, ptk_anm2_edit_view_treeview_insert_selector));
+  TEST_MSG("Should emit insert_selector differential event");
+  TEST_CHECK(log_count_op(&log, ptk_anm2_edit_view_treeview_insert_item) == 2);
+  TEST_MSG("Should emit 2 insert_item differential events");
+  TEST_CHECK(!log_contains_op(&log, ptk_anm2_edit_view_treeview_rebuild));
+  TEST_MSG("Should NOT emit rebuild - use differential updates");
 
   ptk_anm2_edit_destroy(&edit);
 }
 
+// Test: UNDO/REDO emits differential events wrapped in group_begin/end
 static void test_view_callback_undo_redo(void) {
   struct ov_error err = {0};
   struct ptk_anm2_edit *edit = NULL;
@@ -1084,22 +1111,26 @@ static void test_view_callback_undo_redo(void) {
   struct view_callback_log log = {0};
   ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
 
-  // UNDO the transaction - should suppress intermediate events and emit rebuild at end
+  // UNDO the transaction - should emit differential events wrapped in group_begin/end
   TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_undo(edit, &err), &err);
 
-  // Should have rebuild + detail_refresh (not individual remove events)
-  bool has_rebuild = false;
-  bool has_detail_refresh = false;
-  for (size_t i = 0; i < log.count; ++i) {
-    if (log.ops[i] == ptk_anm2_edit_view_treeview_rebuild) {
-      has_rebuild = true;
-    }
-    if (log.ops[i] == ptk_anm2_edit_view_detail_refresh) {
-      has_detail_refresh = true;
-    }
-  }
-  TEST_CHECK(has_rebuild);
-  TEST_CHECK(has_detail_refresh);
+  // Should have: group_begin, remove_item, remove_selector, ..., group_end
+  bool has_group_begin = log_contains_op(&log, ptk_anm2_edit_view_treeview_group_begin);
+  bool has_group_end = log_contains_op(&log, ptk_anm2_edit_view_treeview_group_end);
+  bool has_remove_selector = log_contains_op(&log, ptk_anm2_edit_view_treeview_remove_selector);
+  bool has_remove_item = log_contains_op(&log, ptk_anm2_edit_view_treeview_remove_item);
+  bool has_rebuild = log_contains_op(&log, ptk_anm2_edit_view_treeview_rebuild);
+
+  TEST_CHECK(has_group_begin);
+  TEST_MSG("UNDO should emit group_begin");
+  TEST_CHECK(has_group_end);
+  TEST_MSG("UNDO should emit group_end");
+  TEST_CHECK(has_remove_selector);
+  TEST_MSG("UNDO should emit remove_selector differential event");
+  TEST_CHECK(has_remove_item);
+  TEST_MSG("UNDO should emit remove_item differential event");
+  TEST_CHECK(!has_rebuild);
+  TEST_MSG("UNDO should NOT emit rebuild - use differential updates");
 
   // Clear log
   log.count = 0;
@@ -1107,19 +1138,23 @@ static void test_view_callback_undo_redo(void) {
   // REDO the transaction
   TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_redo(edit, &err), &err);
 
-  // Should also have rebuild + detail_refresh
-  has_rebuild = false;
-  has_detail_refresh = false;
-  for (size_t i = 0; i < log.count; ++i) {
-    if (log.ops[i] == ptk_anm2_edit_view_treeview_rebuild) {
-      has_rebuild = true;
-    }
-    if (log.ops[i] == ptk_anm2_edit_view_detail_refresh) {
-      has_detail_refresh = true;
-    }
-  }
-  TEST_CHECK(has_rebuild);
-  TEST_CHECK(has_detail_refresh);
+  // Should have: group_begin, insert_selector, insert_item, ..., group_end
+  has_group_begin = log_contains_op(&log, ptk_anm2_edit_view_treeview_group_begin);
+  has_group_end = log_contains_op(&log, ptk_anm2_edit_view_treeview_group_end);
+  bool has_insert_selector = log_contains_op(&log, ptk_anm2_edit_view_treeview_insert_selector);
+  bool has_insert_item = log_contains_op(&log, ptk_anm2_edit_view_treeview_insert_item);
+  has_rebuild = log_contains_op(&log, ptk_anm2_edit_view_treeview_rebuild);
+
+  TEST_CHECK(has_group_begin);
+  TEST_MSG("REDO should emit group_begin");
+  TEST_CHECK(has_group_end);
+  TEST_MSG("REDO should emit group_end");
+  TEST_CHECK(has_insert_selector);
+  TEST_MSG("REDO should emit insert_selector differential event");
+  TEST_CHECK(has_insert_item);
+  TEST_MSG("REDO should emit insert_item differential event");
+  TEST_CHECK(!has_rebuild);
+  TEST_MSG("REDO should NOT emit rebuild - use differential updates");
 
   ptk_anm2_edit_destroy(&edit);
 }
@@ -2173,6 +2208,156 @@ static void test_detail_selection_mode_switch(void) {
   ptk_anm2_edit_destroy(&edit);
 }
 
+// Test: transaction should emit differential events wrapped in group_begin/end, not rebuild
+static void test_transaction_emits_differential_events(void) {
+  struct ov_error err = {0};
+  struct ptk_anm2_edit *edit = NULL;
+
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+
+  struct view_callback_log log = {0};
+  ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
+
+  // Start transaction
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_begin_transaction(doc, &err), &err);
+
+  // Add selector and items during transaction
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
+  uint32_t item1_id = ptk_anm2_item_insert_value(doc, sel_id, "Item1", "val1", &err);
+  TEST_ASSERT_SUCCEEDED(item1_id != 0, &err);
+  uint32_t item2_id = ptk_anm2_item_insert_value(doc, sel_id, "Item2", "val2", &err);
+  TEST_ASSERT_SUCCEEDED(item2_id != 0, &err);
+
+  // End transaction
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_end_transaction(doc, &err), &err);
+
+  // Should have: group_begin, insert_selector, insert_item, insert_item, group_end
+  // NOT: rebuild
+  bool has_group_begin = log_contains_op(&log, ptk_anm2_edit_view_treeview_group_begin);
+  bool has_group_end = log_contains_op(&log, ptk_anm2_edit_view_treeview_group_end);
+  bool has_insert_selector = log_contains_op(&log, ptk_anm2_edit_view_treeview_insert_selector);
+  size_t insert_item_count = log_count_op(&log, ptk_anm2_edit_view_treeview_insert_item);
+  bool has_rebuild = log_contains_op(&log, ptk_anm2_edit_view_treeview_rebuild);
+
+  TEST_CHECK(has_group_begin);
+  TEST_MSG("Should emit group_begin at transaction start");
+  TEST_CHECK(has_group_end);
+  TEST_MSG("Should emit group_end at transaction end");
+  TEST_CHECK(has_insert_selector);
+  TEST_MSG("Should emit insert_selector differential event");
+  TEST_CHECK(insert_item_count == 2);
+  TEST_MSG("Should emit 2 insert_item differential events, got %zu", insert_item_count);
+  TEST_CHECK(!has_rebuild);
+  TEST_MSG("Should NOT emit rebuild - use differential updates instead");
+
+  ptk_anm2_edit_destroy(&edit);
+}
+
+// Test: move_items preserves selection state correctly
+// Setup: 5 items (1,2,3,4,5), select items 4 and 5, drop between 1 and 2
+// Expected result: items 4,5 become items 2,3 (shifted), and items 2,3 should be selected
+static void test_move_items_selection_preserved(void) {
+  struct ov_error err = {0};
+  struct ptk_anm2_edit *edit = NULL;
+
+  edit = ptk_anm2_edit_create(&err);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+  struct ptk_anm2 *doc = get_doc(edit);
+  TEST_ASSERT_SUCCEEDED(edit != NULL, &err);
+
+  // Create selector with 5 items
+  uint32_t sel_id = ptk_anm2_selector_insert(doc, 0, "Group1", &err);
+  TEST_ASSERT_SUCCEEDED(sel_id != 0, &err);
+
+  uint32_t item1_id = ptk_anm2_item_insert_value(doc, sel_id, "Item1", "val1", &err);
+  TEST_ASSERT_SUCCEEDED(item1_id != 0, &err);
+  uint32_t item2_id = ptk_anm2_item_insert_value(doc, sel_id, "Item2", "val2", &err);
+  TEST_ASSERT_SUCCEEDED(item2_id != 0, &err);
+  uint32_t item3_id = ptk_anm2_item_insert_value(doc, sel_id, "Item3", "val3", &err);
+  TEST_ASSERT_SUCCEEDED(item3_id != 0, &err);
+  uint32_t item4_id = ptk_anm2_item_insert_value(doc, sel_id, "Item4", "val4", &err);
+  TEST_ASSERT_SUCCEEDED(item4_id != 0, &err);
+  uint32_t item5_id = ptk_anm2_item_insert_value(doc, sel_id, "Item5", "val5", &err);
+  TEST_ASSERT_SUCCEEDED(item5_id != 0, &err);
+
+  // Initial order: item1, item2, item3, item4, item5
+  TEST_CHECK(ptk_anm2_item_get_id(doc, 0, 0) == item1_id);
+  TEST_CHECK(ptk_anm2_item_get_id(doc, 0, 1) == item2_id);
+  TEST_CHECK(ptk_anm2_item_get_id(doc, 0, 2) == item3_id);
+  TEST_CHECK(ptk_anm2_item_get_id(doc, 0, 3) == item4_id);
+  TEST_CHECK(ptk_anm2_item_get_id(doc, 0, 4) == item5_id);
+
+  // Select items 4 and 5 (using Ctrl+Click to multi-select)
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, item4_id, false, false, false, &err), &err);
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_apply_treeview_selection(edit, item5_id, false, true, false, &err), &err);
+
+  // Verify selection
+  TEST_CHECK(ptk_anm2_edit_is_item_selected(edit, item4_id));
+  TEST_CHECK(ptk_anm2_edit_is_item_selected(edit, item5_id));
+  TEST_CHECK(!ptk_anm2_edit_is_item_selected(edit, item1_id));
+  TEST_CHECK(!ptk_anm2_edit_is_item_selected(edit, item2_id));
+  TEST_CHECK(!ptk_anm2_edit_is_item_selected(edit, item3_id));
+
+  // Set up view callback to capture events
+  struct view_callback_log log = {0};
+  ptk_anm2_edit_set_view_callback(edit, view_callback_logger, &log);
+
+  // Move items 4,5 to drop before item2 (between item1 and item2)
+  uint32_t move_ids[2] = {item4_id, item5_id};
+  TEST_ASSERT_SUCCEEDED(ptk_anm2_edit_move_items(edit, move_ids, 2, item2_id, false, false, &err), &err);
+
+  // Verify view events: should have move_item events with correct IDs
+  size_t move_event_count = 0;
+  for (size_t i = 0; i < log.count; ++i) {
+    if (log.ops[i] == ptk_anm2_edit_view_treeview_move_item) {
+      move_event_count++;
+      // Each move_item event should have the correct item ID
+      TEST_CHECK(log.ids[i] == item4_id || log.ids[i] == item5_id);
+      TEST_MSG("move_item event should have item4_id or item5_id, got %u", log.ids[i]);
+    }
+  }
+  TEST_CHECK(move_event_count == 2);
+  TEST_MSG("Should have 2 move_item events, got %zu", move_event_count);
+
+  // Expected order after move: item1, item4, item5, item2, item3
+  TEST_CHECK(ptk_anm2_item_get_id(doc, 0, 0) == item1_id);
+  TEST_MSG("Position 0 should be item1, got item_id=%u", ptk_anm2_item_get_id(doc, 0, 0));
+  TEST_CHECK(ptk_anm2_item_get_id(doc, 0, 1) == item4_id);
+  TEST_MSG("Position 1 should be item4, got item_id=%u", ptk_anm2_item_get_id(doc, 0, 1));
+  TEST_CHECK(ptk_anm2_item_get_id(doc, 0, 2) == item5_id);
+  TEST_MSG("Position 2 should be item5, got item_id=%u", ptk_anm2_item_get_id(doc, 0, 2));
+  TEST_CHECK(ptk_anm2_item_get_id(doc, 0, 3) == item2_id);
+  TEST_MSG("Position 3 should be item2, got item_id=%u", ptk_anm2_item_get_id(doc, 0, 3));
+  TEST_CHECK(ptk_anm2_item_get_id(doc, 0, 4) == item3_id);
+  TEST_MSG("Position 4 should be item3, got item_id=%u", ptk_anm2_item_get_id(doc, 0, 4));
+
+  // Verify selection is preserved: items 4 and 5 (now at positions 1 and 2) should still be selected
+  TEST_CHECK(ptk_anm2_edit_is_item_selected(edit, item4_id));
+  TEST_MSG("item4 should still be selected after move");
+  TEST_CHECK(ptk_anm2_edit_is_item_selected(edit, item5_id));
+  TEST_MSG("item5 should still be selected after move");
+  TEST_CHECK(!ptk_anm2_edit_is_item_selected(edit, item1_id));
+  TEST_MSG("item1 should not be selected");
+  TEST_CHECK(!ptk_anm2_edit_is_item_selected(edit, item2_id));
+  TEST_MSG("item2 should not be selected");
+  TEST_CHECK(!ptk_anm2_edit_is_item_selected(edit, item3_id));
+  TEST_MSG("item3 should not be selected");
+
+  // Verify focus is on item4 (the first moved item)
+  struct ptk_anm2_edit_state state = {0};
+  ptk_anm2_edit_get_state(edit, &state);
+  TEST_CHECK(state.focus_type == ptk_anm2_edit_focus_item);
+  TEST_MSG("Focus type should be item");
+  TEST_CHECK(state.focus_id == item4_id);
+  TEST_MSG("Focus should be on item4 (first in move list), got focus_id=%u", state.focus_id);
+
+  ptk_anm2_edit_destroy(&edit);
+}
+
 TEST_LIST = {
     {"edit_create_destroy", test_edit_create_destroy},
     {"selection_click", test_selection_click},
@@ -2183,6 +2368,7 @@ TEST_LIST = {
     {"edit_item_rename_value", test_edit_item_rename_value},
     {"edit_multisel_detail_updates", test_edit_multisel_detail_updates},
     {"edit_delete_selected", test_edit_delete_selected},
+    {"edit_delete_multiple_selected_items", test_edit_delete_multiple_selected_items},
     {"edit_reverse_focus_selector", test_edit_reverse_focus_selector},
     {"edit_move_items_order", test_edit_move_items_order},
     {"edit_param_ops", test_edit_param_ops},
@@ -2198,7 +2384,7 @@ TEST_LIST = {
     {"view_callback_basic", test_view_callback_basic},
     {"view_callback_on_add_selector", test_view_callback_on_add_selector},
     {"view_callback_on_focus_change", test_view_callback_on_focus_change},
-    {"view_callback_transaction_buffering", test_view_callback_transaction_buffering},
+    {"view_callback_transaction_grouping", test_view_callback_transaction_grouping},
     {"view_callback_undo_redo", test_view_callback_undo_redo},
     {"view_callback_single_op_undo", test_view_callback_single_op_undo},
     {"view_callback_state_dedup", test_view_callback_state_dedup},
@@ -2221,5 +2407,9 @@ TEST_LIST = {
     {"detail_multisel_item_selected", test_detail_multisel_item_selected},
     {"detail_multisel_item_deselected", test_detail_multisel_item_deselected},
     {"detail_selection_mode_switch", test_detail_selection_mode_switch},
+    // Transaction differential update tests
+    {"transaction_emits_differential_events", test_transaction_emits_differential_events},
+    // Selection preservation tests
+    {"move_items_selection_preserved", test_move_items_selection_preserved},
     {NULL, NULL},
 };

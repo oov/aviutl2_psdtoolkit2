@@ -1559,6 +1559,8 @@ void anm2editor_detail_handle_view_event(struct anm2editor_detail *detail,
   case ptk_anm2_edit_view_treeview_move_item:
   case ptk_anm2_edit_view_treeview_select:
   case ptk_anm2_edit_view_treeview_set_focus:
+  case ptk_anm2_edit_view_treeview_group_begin:
+  case ptk_anm2_edit_view_treeview_group_end:
   case ptk_anm2_edit_view_undo_redo_state_changed:
   case ptk_anm2_edit_view_modified_state_changed:
   case ptk_anm2_edit_view_save_state_changed:

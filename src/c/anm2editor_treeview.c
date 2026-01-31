@@ -1379,6 +1379,14 @@ void anm2editor_treeview_handle_view_event(struct anm2editor_treeview *tv,
     anm2editor_treeview_suppress_selection_changed(tv, false);
     break;
 
+  case ptk_anm2_edit_view_treeview_group_begin:
+    anm2editor_treeview_update_differential(tv, anm2editor_treeview_op_group_begin, 0, 0, 0);
+    break;
+
+  case ptk_anm2_edit_view_treeview_group_end:
+    anm2editor_treeview_update_differential(tv, anm2editor_treeview_op_group_end, 0, 0, 0);
+    break;
+
   case ptk_anm2_edit_view_detail_refresh:
   case ptk_anm2_edit_view_detail_insert_param:
   case ptk_anm2_edit_view_detail_remove_param:
