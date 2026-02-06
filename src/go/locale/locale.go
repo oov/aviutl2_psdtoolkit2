@@ -161,8 +161,8 @@ type MO struct {
 	data   []byte
 }
 
-// LoadMO loads translations from PSDToolKit.aux2 in the parent directory of the executable.
-// Directory structure: Plugin/PSDToolKit.aux2 and Plugin/PSDToolKit/PSDToolKit.exe
+// LoadMO loads translations from PSDToolKit.aux2 next to the executable.
+// Directory structure: Plugin/PSDToolKit/PSDToolKit.aux2 and Plugin/PSDToolKit/PSDToolKit.exe
 func LoadMO() (*MO, error) {
 	// Get path to PSDToolKit.aux2
 	var exePath [windows.MAX_PATH]uint16
@@ -171,20 +171,13 @@ func LoadMO() (*MO, error) {
 		return nil, nil
 	}
 
-	// Find parent directory (go up two levels from PSDToolKit.exe)
-	// PSDToolKit.exe is in Plugin/PSDToolKit/
-	// PSDToolKit.aux2 is in Plugin/
 	path := windows.UTF16ToString(exePath[:n])
 	lastSep := strings.LastIndexByte(path, '\\')
 	if lastSep < 0 {
 		return nil, nil
 	}
-	parentDir := path[:lastSep] // Plugin/PSDToolKit
-	lastSep = strings.LastIndexByte(parentDir, '\\')
-	if lastSep < 0 {
-		return nil, nil
-	}
-	aux2Path := parentDir[:lastSep+1] + "PSDToolKit.aux2"
+	exeDir := path[:lastSep+1] // Plugin/PSDToolKit/
+	aux2Path := exeDir + "PSDToolKit.aux2"
 
 	// Load aux2 as data file (doesn't execute DllMain)
 	module, err := windows.LoadLibraryEx(aux2Path, 0, LOAD_LIBRARY_AS_DATAFILE)
